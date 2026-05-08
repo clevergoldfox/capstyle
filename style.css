@@ -1,0 +1,249 @@
+/*
+Theme Name: CapStylus Clone
+Theme URI: https://www.capstylus.com/
+Author: Local Build
+Author URI: https://www.capstylus.com/
+Description: WordPress theme clone of the CapStylus landing page.
+Version: 1.0.0
+Requires at least: 6.0
+Tested up to: 6.5
+Requires PHP: 7.4
+Text Domain: capstylus-clone
+*/
+
+:root {
+  --bg: #0f0f10;
+  --panel: #1a1a1d;
+  --panel-soft: #202025;
+  --text: #f5f5f5;
+  --muted: #c8c8c8;
+  --line: #2f2f36;
+  --accent: #f4b400;
+  --accent-2: #d94f4f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Helvetica Neue", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(15, 15, 16, 0.95);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(4px);
+}
+
+.container {
+  width: min(1120px, 92vw);
+  margin: 0 auto;
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 72px;
+}
+
+.site-branding {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.site-nav a {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.site-nav a:hover {
+  color: var(--text);
+}
+
+.hero {
+  padding: 92px 0 62px;
+  border-bottom: 1px solid var(--line);
+  background:
+    radial-gradient(circle at 75% 15%, rgba(217, 79, 79, 0.2), transparent 38%),
+    radial-gradient(circle at 10% 10%, rgba(244, 180, 0, 0.22), transparent 30%);
+}
+
+.eyebrow {
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.78rem;
+  margin-bottom: 10px;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+}
+
+h1 {
+  margin: 0 0 18px;
+  font-size: clamp(2rem, 5vw, 3.2rem);
+}
+
+h2 {
+  margin: 0 0 18px;
+  font-size: clamp(1.35rem, 3vw, 2rem);
+}
+
+p {
+  margin: 0 0 14px;
+  color: var(--muted);
+}
+
+.hero-actions {
+  margin-top: 28px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.btn {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 11px 20px;
+  font-size: 0.94rem;
+  font-weight: 600;
+  border: 1px solid var(--line);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #111;
+  border-color: transparent;
+}
+
+.btn-secondary {
+  color: var(--text);
+  background: transparent;
+}
+
+.section {
+  padding: 64px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.lead {
+  max-width: 760px;
+}
+
+.caps-grid {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+}
+
+.cap-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.cap-name {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.cap-meta {
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.split {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: 1fr;
+}
+
+.discount-table {
+  width: min(560px, 100%);
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+
+.discount-table th,
+.discount-table td {
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.discount-table thead {
+  background: var(--panel-soft);
+}
+
+.flow-list,
+.faq-list {
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.flow-item,
+.faq-item {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.faq-q {
+  margin: 0 0 7px;
+  font-weight: 700;
+}
+
+.footer {
+  padding: 34px 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.footer-links {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+@media (min-width: 900px) {
+  .split {
+    grid-template-columns: 1fr 1fr;
+  }
+}
