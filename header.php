@@ -20,14 +20,8 @@ if (! defined('ABSPATH')) {
 
 <header class="site-header">
   <div class="container header-inner">
-    <div class="site-branding">
-      <a href="<?php echo esc_url(home_url('/')); ?>">CapStylus</a>
-    </div>
-    <nav class="site-nav" aria-label="<?php esc_attr_e('Primary navigation', 'capstylus-clone'); ?>">
-      <a href="#custom-order"><?php esc_html_e('Custom Order', 'capstylus-clone'); ?></a>
-      <a href="#capbody"><?php esc_html_e('Cap Body', 'capstylus-clone'); ?></a>
-      <a href="#discount"><?php esc_html_e('Volume Discount', 'capstylus-clone'); ?></a>
-      <a href="#faq"><?php esc_html_e('FAQ', 'capstylus-clone'); ?></a>
-    </nav>
+    <a class="site-branding" href="<?php echo esc_url(home_url('/')); ?>">
+      <?php bloginfo('name'); ?>
+    </a>
   </div>
 </header>

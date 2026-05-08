@@ -1,0 +1,468 @@
+/* font_colleges */
+@font-face
+{
+    font-family: 'collegebold';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/collegeb.eot');
+    src: url('../fonts/collegeb.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/collegeb.woff2') format('woff2'),
+    url('../fonts/collegeb.woff') format('woff'),
+    url('../fonts/collegeb.ttf') format('truetype'),
+    url('../fonts/collegeb.svg#collegebold') format('svg');
+}
+
+/* font_allstar */
+@font-face
+{
+    font-family: 'allstarregular';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/all_star_resort.eot');
+    src: url('../fonts/all_star_resort.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/all_star_resort.woff2') format('woff2'),
+    url('../fonts/all_star_resort.woff') format('woff'),
+    url('../fonts/all_star_resort.ttf') format('truetype'),
+    url('../fonts/all_star_resort.svg#allstarregular') format('svg');
+}
+
+/* font_flottflott */
+@font-face
+{
+    font-family: 'flottflottregular';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/flottflott.eot');
+    src: url('../fonts/flottflott.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/flottflott.woff2') format('woff2'),
+    url('../fonts/flottflott.woff') format('woff'),
+    url('../fonts/flottflott.ttf') format('truetype'),
+    url('../fonts/flottflott.svg#flottflottregular') format('svg');
+}
+
+/* font_englishtowne */
+@font-face
+{
+    font-family: 'english_towneregular';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/englishtowne.eot');
+    src: url('../fonts/englishtowne.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/englishtowne.woff2') format('woff2'),
+    url('../fonts/englishtowne.woff') format('woff'),
+    url('../fonts/englishtowne.ttf') format('truetype'),
+    url('../fonts/englishtowne.svg#english_towneregular') format('svg');
+}
+
+/* font_mytupi */
+@font-face
+{
+    font-family: 'mytupiregular';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/mytupi.eot');
+    src: url('../fonts/mytupi.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/mytupi.woff2') format('woff2'),
+    url('../fonts/mytupi.woff') format('woff'),
+    url('../fonts/mytupi.ttf') format('truetype'),
+    url('../fonts/mytupi.svg#mytupiregular') format('svg');
+}
+
+/* font_libre */
+@font-face
+{
+    font-family: 'libre_baskervilleregular';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/librebaskerville-regular.eot');
+    src: url('../fonts/librebaskerville-regular.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/librebaskerville-regular.woff2') format('woff2'),
+    url('../fonts/librebaskerville-regular.woff') format('woff'),
+    url('../fonts/librebaskerville-regular.ttf') format('truetype'),
+    url('../fonts/librebaskerville-regular.svg#libre_baskervilleregular') format('svg');
+}
+
+/* font_rockoflf */
+@font-face
+{
+    font-family: 'rockoflfregular';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/rockoflf.eot');
+    src: url('../fonts/rockoflf.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/rockoflf.woff2') format('woff2'),
+    url('../fonts/rockoflf.woff') format('woff'),
+    url('../fonts/rockoflf.ttf') format('truetype'),
+    url('../fonts/rockoflf.svg#rockoflfregular') format('svg');
+}
+
+/* font_aspire */
+@font-face
+{
+    font-family: 'aspiredemibold';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/aspire-demibold.eot');
+    src: url('../fonts/aspire-demibold.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/aspire-demibold.woff2') format('woff2'),
+    url('../fonts/aspire-demibold.woff') format('woff'),
+    url('../fonts/aspire-demibold.ttf') format('truetype'),
+    url('../fonts/aspire-demibold.svg#aspiredemibold') format('svg');
+}
+
+
+/* font_columbo */
+@font-face
+{
+    font-family: 'columboregular';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/ColumboRegular.eot');
+    src: url('../fonts/ColumboRegular.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/ColumboRegular.woff2') format('woff2'),
+    url('../fonts/ColumboRegular.woff') format('woff'),
+    url('../fonts/ColumboRegular.ttf') format('truetype'),
+    url('../fonts/ColumboRegular.svg#columboregular') format('svg');
+}
+
+
+/* font_agatha */
+@font-face
+{
+    font-family: 'agatharegular';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/agatharegular.eot');
+    src: url('../fonts/agatharegular.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/agatharegular.woff2') format('woff2'),
+    url('../fonts/agatharegular.woff') format('woff'),
+    url('../fonts/agatharegular.ttf') format('truetype'),
+    url('../fonts/agatharegular.svg#agatharegular') format('svg');
+}
+
+
+/* font_arnold */
+@font-face
+{
+    font-family: 'arnoldboecklin';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/ArnoldBoecklin.eot');
+    src: url('../fonts/ArnoldBoecklin.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/ArnoldBoecklin.woff2') format('woff2'),
+    url('../fonts/ArnoldBoecklin.woff') format('woff'),
+    url('../fonts/ArnoldBoecklin.ttf') format('truetype'),
+    url('../fonts/ArnoldBoecklin.svg#arnoldboecklin') format('svg');
+}
+
+
+/* font_bauhaus */
+@font-face
+{
+    font-family: 'bauhaun';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/bauhaun.eot');
+    src: url('../fonts/bauhaun.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/bauhaun.woff2') format('woff2'),
+    url('../fonts/bauhaun.woff') format('woff'),
+    url('../fonts/bauhaun.ttf') format('truetype'),
+    url('../fonts/bauhaun.svg#bauhaun') format('svg');
+}
+
+
+/* font_playbill */
+@font-face
+{
+    font-family: 'playbi';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/playbi.eot');
+    src: url('../fonts/playbi.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/playbi.woff2') format('woff2'),
+    url('../fonts/playbi.woff') format('woff'),
+    url('../fonts/playbi.ttf') format('truetype'),
+    url('../fonts/playbi.svg#playbi') format('svg');
+}
+
+
+/* font_centercity */
+@font-face
+{
+    font-family: 'cybswfte';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/cybswfte.eot');
+    src: url('../fonts/cybswfte.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/cybswfte.woff2') format('woff2'),
+    url('../fonts/cybswfte.woff') format('woff'),
+    url('../fonts/cybswfte.ttf') format('truetype'),
+    url('../fonts/cybswfte.svg#cybswfte') format('svg');
+}
+
+
+/* font_croissantbold */
+@font-face
+{
+    font-family: 'croisbb';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/CROISBB.eot');
+    src: url('../fonts/CROISBB.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/CROISBB.woff2') format('woff2'),
+    url('../fonts/CROISBB.woff') format('woff'),
+    url('../fonts/CROISBB.ttf') format('truetype'),
+    url('../fonts/CROISBB.svg#croisbb') format('svg');
+}
+
+
+/* font_handelgothic */
+@font-face
+{
+    font-family: 'handelgothic';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/HandelGothic.eot');
+    src: url('../fonts/HandelGothic.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/HandelGothic.woff2') format('woff2'),
+    url('../fonts/HandelGothic.woff') format('woff'),
+    url('../fonts/HandelGothic.ttf') format('truetype'),
+    url('../fonts/HandelGothic.svg#handelgothic') format('svg');
+}
+
+
+/* font_handicraft */
+@font-face
+{
+    font-family: 'handi';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/handi.eot');
+    src: url('../fonts/handi.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/handi.woff2') format('woff2'),
+    url('../fonts/handi.woff') format('woff'),
+    url('../fonts/handi.ttf') format('truetype'),
+    url('../fonts/handi.svg#handi') format('svg');
+}
+
+
+/* font_brushscriptwide */
+@font-face
+{
+    font-family: 'brushs';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/brushs.eot');
+    src: url('../fonts/brushs.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/brushs.woff2') format('woff2'),
+    url('../fonts/brushs.woff') format('woff'),
+    url('../fonts/brushs.ttf') format('truetype'),
+    url('../fonts/brushs.svg#brushs') format('svg');
+}
+
+
+/* font_harrington */
+@font-face
+{
+    font-family: 'harngton';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/HARNGTON.eot');
+    src: url('../fonts/HARNGTON.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/HARNGTON.woff2') format('woff2'),
+    url('../fonts/HARNGTON.woff') format('woff'),
+    url('../fonts/HARNGTON.ttf') format('truetype'),
+    url('../fonts/HARNGTON.svg#harngton') format('svg');
+}
+
+
+/* font_hobo-wd */
+@font-face
+{
+    font-family: 'hobo';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/hobo.eot');
+    src: url('../fonts/hobo.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/hobo.woff2') format('woff2'),
+    url('../fonts/hobo.woff') format('woff'),
+    url('../fonts/hobo.ttf') format('truetype'),
+    url('../fonts/hobo.svg#hobo') format('svg');
+}
+
+
+/* font_hp-kids */
+@font-face
+{
+    font-family: 'hp-kids';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/HP-Kids.eot');
+    src: url('../fonts/HP-Kids.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/HP-Kids.woff2') format('woff2'),
+    url('../fonts/HP-Kids.woff') format('woff'),
+    url('../fonts/HP-Kids.ttf') format('truetype'),
+    url('../fonts/HP-Kids.svg#hp-kids') format('svg');
+}
+
+
+/* font_impress */
+@font-face
+{
+    font-family: 'impressbt';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/ImpressBT.eot');
+    src: url('../fonts/ImpressBT.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/ImpressBT.woff2') format('woff2'),
+    url('../fonts/ImpressBT.woff') format('woff'),
+    url('../fonts/ImpressBT.ttf') format('truetype'),
+    url('../fonts/ImpressBT.svg#impressbt') format('svg');
+}
+
+
+/* font_typewriter-medium */
+@font-face
+{
+    font-family: 'typewriter-medium';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/Typewriter-Medium.eot');
+    src: url('../fonts/Typewriter-Medium.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/Typewriter-Medium.woff2') format('woff2'),
+    url('../fonts/Typewriter-Medium.woff') format('woff'),
+    url('../fonts/Typewriter-Medium.ttf') format('truetype'),
+    url('../fonts/Typewriter-Medium.svg#typewriter-medium') format('svg');
+}
+
+
+/* font_bocuma */
+@font-face
+{
+    font-family: 'bocuma-angle-dent-brk';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/Bocuma-Angle-Dent-BRK.eot');
+    src: url('../fonts/Bocuma-Angle-Dent-BRK.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/Bocuma-Angle-Dent-BRK.woff2') format('woff2'),
+    url('../fonts/Bocuma-Angle-Dent-BRK.woff') format('woff'),
+    url('../fonts/Bocuma-Angle-Dent-BRK.ttf') format('truetype'),
+    url('../fonts/Bocuma-Angle-Dent-BRK.svg#bocuma-angle-dent-brk') format('svg');
+}
+
+
+/* font_celtic */
+@font-face
+{
+    font-family: 'celtir';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/Celtir.eot');
+    src: url('../fonts/Celtir.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/Celtir.woff2') format('woff2'),
+    url('../fonts/Celtir.woff') format('woff'),
+    url('../fonts/Celtir.ttf') format('truetype'),
+    url('../fonts/Celtir.svg#celtir') format('svg');
+}
+
+
+/* font_civiclight */
+@font-face
+{
+    font-family: 'civiclightregular';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/civiclightregular.eot');
+    src: url('../fonts/civiclightregular.eot?#iefix') format('embedded-opentype'),
+    url('../fonts/civiclightregular.woff2') format('woff2'),
+    url('../fonts/civiclightregular.woff') format('woff'),
+    url('../fonts/civiclightregular.ttf') format('truetype'),
+    url('../fonts/civiclightregular.svg#civiclightregular') format('svg');
+}
+
+
+
+
+/* japan font */
+/* 楷書体 */
+@font-face
+{
+    font-family: 'hgrskp';
+    font-weight: bold;
+    font-style: normal;
+
+    src: url('../fonts/A-OTF-KaishoMCBK1Pro-DeBold.otf') format('truetype');
+}
+/* 行書体 */
+@font-face
+{
+    font-family: 'HGRGY';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/A-OTF-KochoStd-Heavy.otf') format('truetype');
+}
+/* 角ゴシック体 */
+@font-face
+{
+    font-family: 'HGRSGU';
+    font-weight: normal;
+    font-style: normal;
+    src: url('../fonts/A-OTF-ShinGoPro-Bold.otf') format('truetype');
+}
+/* 明朝体 */
+@font-face
+{
+    font-family: 'HGRME';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/A-OTF-RyuminPr5-Heavy.otf') format('truetype');
+}
+
+/* 勘亭流 */
+@font-face
+{
+    font-family: 'EDOKAN';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/A-OTF-KanteiryuStd-Ultra.otf') format('truetype');
+}
+
+
+/* 丸ゴシック体 */
+@font-face
+{
+    font-family: 'hgrsmp';
+    font-weight: normal;
+    font-style: normal;
+
+    src: url('../fonts/A-OTF-ShinMGoPro-Bold.otf') format('truetype');
+}
