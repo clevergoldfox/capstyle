@@ -139,11 +139,22 @@ function capstylus_clone_serve_mirror_pages()
 
     $request_uri  = isset($_SERVER['REQUEST_URI']) ? wp_unslash($_SERVER['REQUEST_URI']) : '/';
     $request_path = wp_parse_url($request_uri, PHP_URL_PATH);
-    if (trim((string) $request_path, '/') === 'simulator') {
+    if (! is_string($request_path)) {
         return;
     }
 
-    if (! is_string($request_path)) {
+    // Support subdirectory installs like /wordpress.
+    $home_path = wp_parse_url(home_url('/'), PHP_URL_PATH);
+    if (is_string($home_path) && $home_path !== '' && $home_path !== '/') {
+        if (strpos($request_path, $home_path) === 0) {
+            $request_path = substr($request_path, strlen($home_path));
+            if (! is_string($request_path) || $request_path === '') {
+                $request_path = '/';
+            }
+        }
+    }
+
+    if (trim((string) $request_path, '/') === 'simulator') {
         return;
     }
 
