@@ -216,7 +216,7 @@ $(function(){
 	}
 
 
-	// urlを保存・オーダーフォームへ遷移
+	// urlを保存
 	$('.btn-order').bind('click',function(){
 		var url = 'https://www.capstylus.com/?body=' + selected.body + '&cap=' + selected.cap + '&price=' + selected.price + '&font=' + selected.font + '&text=' + selected.text + '&color=' + selected.color + '&size=' + selected.style.size + '&kerning=' + selected.style.kerning + '&vertical=' + selected.style.vertical + '&lateral=' + selected.style.lateral;
 
@@ -244,22 +244,6 @@ $(function(){
 		});*/
 
 		$('.url').val(encodeURI(url));
-
-		var qs = 'body=' + encodeURIComponent(selected.body)
-			+ '&cap=' + encodeURIComponent(selected.cap)
-			+ '&price=' + encodeURIComponent(selected.price)
-			+ '&font=' + encodeURIComponent(selected.font)
-			+ '&text=' + encodeURIComponent(selected.text)
-			+ '&color=' + encodeURIComponent(selected.color)
-			+ '&size=' + encodeURIComponent(selected.style.size)
-			+ '&kerning=' + encodeURIComponent(selected.style.kerning)
-			+ '&vertical=' + encodeURIComponent(selected.style.vertical)
-			+ '&lateral=' + encodeURIComponent(selected.style.lateral);
-		var policyBase = (typeof window.NEW_ORDER_POLICY_URL !== 'undefined' && window.NEW_ORDER_POLICY_URL) ? String(window.NEW_ORDER_POLICY_URL).replace(/\/?$/, '') : '';
-		if (!policyBase) {
-			policyBase = window.location.pathname.indexOf('/wordpress') === 0 ? '/wordpress/policy' : '/policy';
-		}
-		window.location.href = policyBase + '/?' + qs;
 
 	});
 

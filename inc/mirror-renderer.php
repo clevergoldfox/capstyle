@@ -121,14 +121,10 @@ function capstylus_clone_rewrite_mirror_html($html)
         $html
     );
 
-    // Policy URL for simulator 「オーダーする」 (edit.js).
-    $policy_url_js = wp_json_encode(home_url('/policy/'));
-
     // Ensure white logo rendering on dark header areas.
     $html = str_replace(
         '</head>',
-        '<script>window.NEW_ORDER_POLICY_URL=' . $policy_url_js . ';</script>'
-        . '<style>header h1 img[src*="/assets/images/logo-white.png"]{max-height:46px;width:auto;display:block}.site-branding img[src*="/assets/images/logo.png"]{max-height:46px;width:auto}</style></head>',
+        '<style>header h1 img[src*="/assets/images/logo-white.png"]{max-height:46px;width:auto;display:block}.site-branding img[src*="/assets/images/logo.png"]{max-height:46px;width:auto}</style></head>',
         $html
     );
 
