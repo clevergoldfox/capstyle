@@ -112,6 +112,37 @@ function neworder_get_notification_email()
     return apply_filters('neworder_notification_email', 'info@neworder-cap.com');
 }
 
+/**
+ * Legacy mirror URLs may still use capstylus.com; admin mail should show this site (e.g. neworder-cap.com).
+ *
+ * @param string $url Raw design URL (may include query string).
+ * @return string
+ */
+function neworder_normalize_design_share_url($url)
+{
+    $url = trim((string) $url);
+    if ($url === '') {
+        return '';
+    }
+
+    $home = wp_parse_url(home_url('/'));
+    if (! is_array($home) || empty($home['scheme']) || empty($home['host'])) {
+        return $url;
+    }
+
+    $replacement = $home['scheme'] . '://' . $home['host'];
+    if (! empty($home['port'])) {
+        $replacement .= ':' . (int) $home['port'];
+    }
+    if (! empty($home['path']) && $home['path'] !== '/') {
+        $replacement .= untrailingslashit($home['path']);
+    }
+
+    $out = preg_replace('#https?://(?:www\.)?capstylus\.com#i', $replacement, $url);
+
+    return is_string($out) ? $out : $url;
+}
+
 function neworder_build_admin_message_body(array $f)
 {
     $lines = array(
@@ -228,7 +259,13 @@ function neworder_dispatch_order_request(array $params)
         'text-001'       => sanitize_text_field(wp_unslash((string) ($params['text-001'] ?? ''))),
         'text-002'       => sanitize_text_field(wp_unslash((string) ($params['text-002'] ?? ''))),
         'text-003'       => sanitize_text_field(wp_unslash((string) ($params['text-003'] ?? ''))),
-        'text-013'       => esc_url_raw(wp_unslash((string) ($params['text-013'] ?? ''))),
+        'text-013'       => apply_filters(
+            'neworder_design_url_for_email',
+            neworder_normalize_design_share_url(
+                esc_url_raw(wp_unslash((string) ($params['text-013'] ?? '')))
+            ),
+            $params
+        ),
         'text-011'       => sanitize_text_field(wp_unslash((string) ($params['text-011'] ?? ''))),
         'text-004'       => sanitize_text_field(wp_unslash((string) ($params['text-004'] ?? ''))),
         'text-005'       => sanitize_text_field(wp_unslash((string) ($params['text-005'] ?? ''))),
