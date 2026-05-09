@@ -25,6 +25,7 @@ function capstylus_clone_rewrite_mirror_html($html)
     $home_root  = trailingslashit(home_url('/'));
     $logo_uri   = get_template_directory_uri() . '/assets/images/logo.png';
     $favicon_uri = get_template_directory_uri() . '/assets/images/favicon.png';
+    $legacy_mirror_uri = trailingslashit(home_url('/')) . 'wp-content/themes/capstyle/mirror';
 
     $html = str_replace('https://www.capstylus.com', $mirror_uri, $html);
     $html = str_replace('http://www.capstylus.com', $mirror_uri, $html);
@@ -46,6 +47,43 @@ function capstylus_clone_rewrite_mirror_html($html)
     $html = preg_replace('/<meta property="og:image" content="[^"]*"\s*\/?>/i', '<meta property="og:image" content="' . esc_url($logo_uri) . '" />', $html);
     $html = preg_replace('/<link rel="shortcut icon"[^>]*>/i', '<link rel="shortcut icon" href="' . esc_url($favicon_uri) . '" type="image/png">', $html);
     $html = preg_replace('/<link rel="apple-touch-icon-precomposed"[^>]*>/i', '<link rel="apple-touch-icon-precomposed" href="' . esc_url($favicon_uri) . '">', $html);
+    $html = preg_replace('/<img([^>]+)src="[^"]*logo[^"]*"([^>]*)>/i', '<img$1src="' . esc_url($logo_uri) . '"$2>', $html);
+
+    // Keep asset links on mirror, but route page/form links to home URL.
+    $html = preg_replace_callback(
+        '/\b(href|action)="([^"]+)"/i',
+        static function ($matches) use ($mirror_uri, $legacy_mirror_uri, $home_root) {
+            $attribute = $matches[1];
+            $url = $matches[2];
+            $normalized = $url;
+            $mirror_prefixes = array($mirror_uri . '/', rtrim($mirror_uri, '/'), $legacy_mirror_uri . '/', rtrim($legacy_mirror_uri, '/'));
+
+            foreach ($mirror_prefixes as $prefix) {
+                if (stripos($url, $prefix) === 0) {
+                    $normalized = ltrim(substr($url, strlen($prefix)), '/');
+                    break;
+                }
+            }
+
+            if ($normalized === $url) {
+                return $matches[0];
+            }
+
+            if (preg_match('#^(wp-content/|wp-includes/|_endpoints/)#i', $normalized)) {
+                return $attribute . '="' . esc_url($mirror_uri . '/' . ltrim($normalized, '/')) . '"';
+            }
+
+            return $attribute . '="' . esc_url($home_root . ltrim($normalized, '/')) . '"';
+        },
+        $html
+    );
+
+    // Make logo visible in dark mirrored headers.
+    $html = str_replace(
+        '</head>',
+        '<style>img[src*="/assets/images/logo.png"]{filter:invert(1) brightness(2)}.site-branding img[src*="/assets/images/logo.png"]{max-height:46px;width:auto}</style></head>',
+        $html
+    );
 
     return $html;
 }
