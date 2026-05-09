@@ -19,6 +19,45 @@ function capstylus_clone_get_mirror_uri()
     return untrailingslashit(get_template_directory_uri()) . '/mirror';
 }
 
+/**
+ * Remove mirrored CapStylus sections that NEW ORDER does not use (non–New Era SKUs, third-party branding).
+ *
+ * @param string $html Raw or partially rewritten mirror HTML.
+ * @return string
+ */
+function neworder_mirror_apply_content_filters($html)
+{
+    // Simulator: cap radios from BRIMSTAR through last non–NE body, up to font selection.
+    $html = preg_replace(
+        '#<!-- BRIMSTAR BRS01-001 -->.*?(?=<input type="radio" name="font")#s',
+        '',
+        $html
+    );
+
+    // Home: CAPBODY section — non–New Era listings and 「その他」 promo row.
+    $html = preg_replace(
+        '#\s*<div class="capbodyBox clearfix wow fadeInUp" data-wow-duration="1\.6s">\s*<h2><img[^>]*body_brimstar[^>]*>[\s\S]*?<div class="capbodyBox clearfix wow fadeInUp" data-wow-duration="1\.6s" style="text-align:center;">[\s\S]*?<!-- /capbodyBox -->#',
+        '',
+        $html
+    );
+
+    // Black background multi-brand logo strip.
+    $html = preg_replace(
+        '#<section class="brands">[\s\S]*?</section>\s*<!--\s*/brands\s*-->#',
+        '',
+        $html
+    );
+
+    // Footer Mask Stylus promo block.
+    $html = preg_replace(
+        '#<div class="mailMag">\s*<div class="bn-link">[\s\S]*?</div>\s*</div>\s*#',
+        '',
+        $html
+    );
+
+    return $html;
+}
+
 function capstylus_clone_rewrite_mirror_html($html)
 {
     $mirror_uri = capstylus_clone_get_mirror_uri();
@@ -82,12 +121,18 @@ function capstylus_clone_rewrite_mirror_html($html)
         $html
     );
 
+    // Policy URL for simulator 「オーダーする」 (edit.js).
+    $policy_url_js = wp_json_encode(home_url('/policy/'));
+
     // Ensure white logo rendering on dark header areas.
     $html = str_replace(
         '</head>',
-        '<style>header h1 img[src*="/assets/images/logo-white.png"]{max-height:46px;width:auto;display:block}.site-branding img[src*="/assets/images/logo.png"]{max-height:46px;width:auto}</style></head>',
+        '<script>window.NEW_ORDER_POLICY_URL=' . $policy_url_js . ';</script>'
+        . '<style>header h1 img[src*="/assets/images/logo-white.png"]{max-height:46px;width:auto;display:block}.site-branding img[src*="/assets/images/logo.png"]{max-height:46px;width:auto}</style></head>',
         $html
     );
+
+    $html = neworder_mirror_apply_content_filters($html);
 
     return $html;
 }
