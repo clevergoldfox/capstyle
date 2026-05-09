@@ -189,7 +189,7 @@ $(function(){
 			cap:   "NEWERA NE400 / BLACK",
 			price: "¥ 4,800",
 			font:  "font_colleges",
-			text:  "CapStylus",
+			text:  "New Order",
 			color: "color_1",
 			style: {
 				size:     550,
@@ -204,7 +204,7 @@ $(function(){
 			cap:   "NEWERA NE400 / BLACK",
 			price: "¥ 4,800",
 			font:  "font_colleges",
-			text:  "CapStylus",
+			text:  "New Order",
 			color: "color_1",
 			style: {
 				size:     240,
