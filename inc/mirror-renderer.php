@@ -27,9 +27,10 @@ function capstylus_clone_get_mirror_uri()
  */
 function neworder_mirror_apply_content_filters($html)
 {
-    // Simulator: cap radios from BRIMSTAR through last non–NE body, up to font selection.
+    // Simulator: non–NE cap radios only. MUST keep capBody closures + fontBody/fontBodyInner
+    // (do not delete up to first name="font" — that stripped </div></div><div class="fontBody">).
     $html = preg_replace(
-        '#<!-- BRIMSTAR BRS01-001 -->.*?(?=<input type="radio" name="font")#s',
+        '#<!-- BRIMSTAR BRS01-001 -->.*?(?=\s*</div>\s*</div>\s*<div class="fontBody">\s*<div class="fontBodyInner">)#s',
         '',
         $html
     );
