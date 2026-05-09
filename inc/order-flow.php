@@ -25,6 +25,29 @@ function neworder_register_order_rest_route()
 }
 add_action('rest_api_init', 'neworder_register_order_rest_route');
 
+/**
+ * Many hosts / WAFs block POST to /wp-json/*. Front-end submits here first.
+ */
+function neworder_ajax_handle_order_submit()
+{
+    $params = wp_unslash($_POST);
+    unset($params['action']);
+    $response = neworder_dispatch_order_request($params);
+    wp_send_json($response->get_data(), $response->get_status());
+}
+add_action('wp_ajax_nopriv_neworder_submit_order', 'neworder_ajax_handle_order_submit');
+add_action('wp_ajax_neworder_submit_order', 'neworder_ajax_handle_order_submit');
+
+function neworder_rest_handle_order_post(WP_REST_Request $request)
+{
+    $params = $request->get_json_params();
+    if (! is_array($params)) {
+        return new WP_REST_Response(array('success' => false, 'message' => __('リクエスト形式が無効です。', 'capstylus-clone')), 400);
+    }
+
+    return neworder_dispatch_order_request($params);
+}
+
 function neworder_get_notification_email()
 {
     return apply_filters('neworder_notification_email', 'info@neworder-cap.com');
@@ -70,20 +93,24 @@ function neworder_build_customer_confirmation_body($name)
         . "ご注文を受け付けました。\n"
         . "現在検討中なので、しばらくお待ちください。\n\n"
         . "---\n"
-        . "NEW ORDER";
+        . 'NEW ORDER';
 }
 
-function neworder_rest_handle_order_post(WP_REST_Request $request)
+/**
+ * Shared order processor (REST JSON or admin-ajax $_POST).
+ *
+ * @param array $params Mixed keys mirroring front form (+ _wpnonce).
+ * @return WP_REST_Response Payload always JSON shape { success, message?, customerMailSent? } (status as HTTP code).
+ */
+function neworder_dispatch_order_request(array $params)
 {
-    $params = $request->get_json_params();
-    if (! is_array($params)) {
-        return new WP_REST_Response(array('success' => false, 'message' => __('リクエスト形式が無効です。', 'capstylus-clone')), 400);
-    }
-
-    $nonce = isset($params['_wpnonce']) ? sanitize_text_field(wp_unslash($params['_wpnonce'])) : '';
+    $nonce = isset($params['_wpnonce']) ? sanitize_text_field(wp_unslash((string) $params['_wpnonce'])) : '';
     if (! wp_verify_nonce($nonce, NEWORDER_ORDER_NONCE_ACTION)) {
         return new WP_REST_Response(
-            array('success' => false, 'message' => __('送信の有効期限が切れたか、検証に失敗しました。ページを再読み込みしてください。', 'capstylus-clone')),
+            array(
+                'success' => false,
+                'message' => __('送信の有効期限が切れたか、検証に失敗しました。ページを再読み込みしてください。', 'capstylus-clone'),
+            ),
             403
         );
     }
@@ -95,14 +122,14 @@ function neworder_rest_handle_order_post(WP_REST_Request $request)
         );
     }
 
-    $your_name          = sanitize_text_field(wp_unslash($params['your-name'] ?? ''));
-    $your_email         = sanitize_email(wp_unslash($params['your-email'] ?? ''));
-    $your_email_confirm = sanitize_email(wp_unslash($params['your-email_confirm'] ?? ''));
-    $address            = sanitize_text_field(wp_unslash($params['address'] ?? ''));
-    $telephone          = sanitize_text_field(wp_unslash($params['telephone'] ?? ''));
-    $order_qty          = sanitize_text_field(wp_unslash($params['text-012'] ?? ''));
-    $payment            = sanitize_text_field(wp_unslash($params['menu-001'] ?? ''));
-    $remarks            = sanitize_textarea_field(wp_unslash($params['your-message'] ?? ''));
+    $your_name          = sanitize_text_field(wp_unslash((string) ($params['your-name'] ?? '')));
+    $your_email         = sanitize_email(wp_unslash((string) ($params['your-email'] ?? '')));
+    $your_email_confirm = sanitize_email(wp_unslash((string) ($params['your-email_confirm'] ?? '')));
+    $address            = sanitize_text_field(wp_unslash((string) ($params['address'] ?? '')));
+    $telephone          = sanitize_text_field(wp_unslash((string) ($params['telephone'] ?? '')));
+    $order_qty          = sanitize_text_field(wp_unslash((string) ($params['text-012'] ?? '')));
+    $payment            = sanitize_text_field(wp_unslash((string) ($params['menu-001'] ?? '')));
+    $remarks            = sanitize_textarea_field(wp_unslash((string) ($params['your-message'] ?? '')));
 
     if ($your_name === '' || $your_email === '' || $address === '' || $telephone === '' || $order_qty === '') {
         return new WP_REST_Response(array('success' => false, 'message' => __('必須項目を入力してください。', 'capstylus-clone')), 400);
@@ -122,7 +149,12 @@ function neworder_rest_handle_order_post(WP_REST_Request $request)
     }
 
     $mailmag_parts = isset($params['checkbox-001']) ? (array) $params['checkbox-001'] : array();
-    $mailmag_parts = array_map('sanitize_text_field', wp_unslash($mailmag_parts));
+    $mailmag_parts = array_map(
+        static function ($v) {
+            return sanitize_text_field(wp_unslash((string) $v));
+        },
+        $mailmag_parts
+    );
     $mailmag_label = $mailmag_parts !== array() ? implode(', ', $mailmag_parts) : '希望しない';
 
     $f = array(
@@ -134,18 +166,18 @@ function neworder_rest_handle_order_post(WP_REST_Request $request)
         'menu-001'       => $payment,
         '_mailmag_label' => $mailmag_label,
         'your-message'   => $remarks,
-        'text-001'       => sanitize_text_field(wp_unslash($params['text-001'] ?? '')),
-        'text-002'       => sanitize_text_field(wp_unslash($params['text-002'] ?? '')),
-        'text-003'       => sanitize_text_field(wp_unslash($params['text-003'] ?? '')),
-        'text-013'       => esc_url_raw(wp_unslash($params['text-013'] ?? '')),
-        'text-011'       => sanitize_text_field(wp_unslash($params['text-011'] ?? '')),
-        'text-004'       => sanitize_text_field(wp_unslash($params['text-004'] ?? '')),
-        'text-005'       => sanitize_text_field(wp_unslash($params['text-005'] ?? '')),
-        'text-006'       => sanitize_text_field(wp_unslash($params['text-006'] ?? '')),
-        'text-007'       => sanitize_text_field(wp_unslash($params['text-007'] ?? '')),
-        'text-008'       => sanitize_text_field(wp_unslash($params['text-008'] ?? '')),
-        'text-009'       => sanitize_text_field(wp_unslash($params['text-009'] ?? '')),
-        'text-010'       => sanitize_text_field(wp_unslash($params['text-010'] ?? '')),
+        'text-001'       => sanitize_text_field(wp_unslash((string) ($params['text-001'] ?? ''))),
+        'text-002'       => sanitize_text_field(wp_unslash((string) ($params['text-002'] ?? ''))),
+        'text-003'       => sanitize_text_field(wp_unslash((string) ($params['text-003'] ?? ''))),
+        'text-013'       => esc_url_raw(wp_unslash((string) ($params['text-013'] ?? ''))),
+        'text-011'       => sanitize_text_field(wp_unslash((string) ($params['text-011'] ?? ''))),
+        'text-004'       => sanitize_text_field(wp_unslash((string) ($params['text-004'] ?? ''))),
+        'text-005'       => sanitize_text_field(wp_unslash((string) ($params['text-005'] ?? ''))),
+        'text-006'       => sanitize_text_field(wp_unslash((string) ($params['text-006'] ?? ''))),
+        'text-007'       => sanitize_text_field(wp_unslash((string) ($params['text-007'] ?? ''))),
+        'text-008'       => sanitize_text_field(wp_unslash((string) ($params['text-008'] ?? ''))),
+        'text-009'       => sanitize_text_field(wp_unslash((string) ($params['text-009'] ?? ''))),
+        'text-010'       => sanitize_text_field(wp_unslash((string) ($params['text-010'] ?? ''))),
     );
 
     do_action('neworder_before_send_order_emails', $f);
@@ -172,7 +204,6 @@ function neworder_rest_handle_order_post(WP_REST_Request $request)
     $customer_body    = apply_filters('neworder_customer_email_body', $customer_body, $f);
 
     $admin_sent = wp_mail($admin_email, $admin_subject, $admin_body, $admin_headers);
-
     $customer_sent = wp_mail($your_email, $customer_subject, $customer_body, $customer_headers);
 
     if (! $admin_sent) {
@@ -204,6 +235,7 @@ function neworder_mirror_append_order_submit_script($html)
 
     $config = wp_json_encode(
         array(
+            'ajaxUrl'  => esc_url_raw(admin_url('admin-ajax.php')),
             'endpoint' => esc_url_raw(rest_url('neworder/v1/order')),
             'nonce'    => wp_create_nonce(NEWORDER_ORDER_NONCE_ACTION),
         ),

@@ -2,21 +2,12 @@
  * Hijack mirrored CF7 order form → JSON POST → NEW ORDER REST.
  */
 (function () {
-  function formToOrderedPayload(form, nonce) {
-    var data = { _wpnonce: nonce };
-    var fd = new FormData(form);
-    fd.forEach(function (value, key) {
-      if (data[key] === undefined) {
-        data[key] = value;
-        return;
-      }
-      if (Array.isArray(data[key])) {
-        data[key].push(value);
-        return;
-      }
-      data[key] = [data[key], value];
-    });
-    return data;
+  function parseResponseJson(resp, text) {
+    try {
+      return JSON.parse(text);
+    } catch (_e) {
+      return null;
+    }
   }
 
   function setSending(formEl, submitting) {
@@ -48,7 +39,7 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     var cfg = window.NEW_ORDER_ORDER_SUBMIT;
-    if (!cfg || !cfg.endpoint || !cfg.nonce) {
+    if (!cfg || !cfg.ajaxUrl || !cfg.nonce) {
       return;
     }
 
@@ -70,41 +61,49 @@
       showMessage(out, '', false);
 
       try {
-        var payload = formToOrderedPayload(form, cfg.nonce);
-
-        /* Unchecked checkbox does not serialize; omit key for acceptance. */
+        var fd = new FormData(form);
+        fd.set('action', 'neworder_submit_order');
+        fd.set('_wpnonce', cfg.nonce);
 
         setSending(form, true);
 
-        fetch(cfg.endpoint, {
+        fetch(cfg.ajaxUrl, {
           method: 'POST',
           credentials: 'same-origin',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(payload)
+          body: fd
         })
           .then(function (resp) {
-            return resp.json().then(function (body) {
-              return { ok: resp.ok, status: resp.status, body: body };
+            return resp.text().then(function (text) {
+              return {
+                ok: resp.ok,
+                status: resp.status,
+                body: parseResponseJson(resp, text),
+                rawLen: text.length
+              };
             });
           })
           .then(function (pack) {
             setSending(form, false);
 
-            var success = !!(pack.body && pack.body.success);
-            var msg = (pack.body && pack.body.message) ||
-              (success
-                ? '送信しました。'
-                : '送信に失敗しました。');
+            if (!pack.body) {
+              showMessage(
+                out,
+                'サーバー応答を解釈できませんでした（HTTP ' +
+                  pack.status +
+                  '）。セキュリティ設定で admin-ajax がブロックされていないか確認してください。',
+                true
+              );
+              return;
+            }
 
-            if (
-              pack.body &&
-              success &&
-              pack.body.customerMailSent === false
-            ) {
-              msg += ' （確認メールの送信のみ失敗しました。管理者には届いている可能性があります。）';
+            var success = !!pack.body.success;
+            var msg =
+              pack.body.message ||
+              (success ? '送信しました。' : '送信に失敗しました。');
+
+            if (success && pack.body.customerMailSent === false) {
+              msg +=
+                ' （確認メールの送信のみ失敗しました。管理者には届いている可能性があります。）';
               showMessage(out, msg, true);
               return;
             }
