@@ -130,6 +130,10 @@ function capstylus_clone_rewrite_mirror_html($html)
 
     $html = neworder_mirror_apply_content_filters($html);
 
+    if (function_exists('neworder_mirror_append_order_submit_script')) {
+        $html = neworder_mirror_append_order_submit_script($html);
+    }
+
     return $html;
 }
 
