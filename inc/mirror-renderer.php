@@ -24,6 +24,7 @@ function capstylus_clone_rewrite_mirror_html($html)
     $mirror_uri = capstylus_clone_get_mirror_uri();
     $home_root  = trailingslashit(home_url('/'));
     $logo_uri   = get_template_directory_uri() . '/assets/images/logo.png';
+    $logo_white_uri = get_template_directory_uri() . '/assets/images/logo-white.png';
     $favicon_uri = get_template_directory_uri() . '/assets/images/favicon.png';
     $legacy_mirror_uri = trailingslashit(home_url('/')) . 'wp-content/themes/capstyle/mirror';
 
@@ -47,7 +48,10 @@ function capstylus_clone_rewrite_mirror_html($html)
     $html = preg_replace('/<meta property="og:image" content="[^"]*"\s*\/?>/i', '<meta property="og:image" content="' . esc_url($logo_uri) . '" />', $html);
     $html = preg_replace('/<link rel="shortcut icon"[^>]*>/i', '<link rel="shortcut icon" href="' . esc_url($favicon_uri) . '" type="image/png">', $html);
     $html = preg_replace('/<link rel="apple-touch-icon-precomposed"[^>]*>/i', '<link rel="apple-touch-icon-precomposed" href="' . esc_url($favicon_uri) . '">', $html);
-    $html = preg_replace('/<img([^>]+)src="[^"]*logo[^"]*"([^>]*)>/i', '<img$1src="' . esc_url($logo_uri) . '"$2>', $html);
+    // Replace top dark-header logo with white NEW ORDER logo.
+    $html = preg_replace('/<h1>\s*<a[^>]*>\s*<img[^>]*src="[^"]*capstylus\.png"[^>]*>\s*<\/a>\s*<\/h1>/i', '<h1><a href="' . esc_url($home_root) . '"><img src="' . esc_url($logo_white_uri) . '" alt="NEW ORDER"></a></h1>', $html);
+    // Keep other branded logos (fallback).
+    $html = preg_replace('/<img([^>]+)src="[^"]*\/assets\/images\/logo\.png"([^>]*)>/i', '<img$1src="' . esc_url($logo_uri) . '"$2>', $html);
 
     // Keep asset links on mirror, but route page/form links to home URL.
     $html = preg_replace_callback(
@@ -78,10 +82,10 @@ function capstylus_clone_rewrite_mirror_html($html)
         $html
     );
 
-    // Make logo visible in dark mirrored headers.
+    // Ensure white logo rendering on dark header areas.
     $html = str_replace(
         '</head>',
-        '<style>img[src*="/assets/images/logo.png"]{filter:invert(1) brightness(2)}.site-branding img[src*="/assets/images/logo.png"]{max-height:46px;width:auto}</style></head>',
+        '<style>header h1 img[src*="/assets/images/logo-white.png"]{max-height:46px;width:auto;display:block}.site-branding img[src*="/assets/images/logo.png"]{max-height:46px;width:auto}</style></head>',
         $html
     );
 
