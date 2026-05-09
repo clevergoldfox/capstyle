@@ -23,6 +23,8 @@ function capstylus_clone_rewrite_mirror_html($html)
 {
     $mirror_uri = capstylus_clone_get_mirror_uri();
     $home_root  = trailingslashit(home_url('/'));
+    $logo_uri   = get_template_directory_uri() . '/assets/images/logo.png';
+    $favicon_uri = get_template_directory_uri() . '/assets/images/favicon.png';
 
     $html = str_replace('https://www.capstylus.com', $mirror_uri, $html);
     $html = str_replace('http://www.capstylus.com', $mirror_uri, $html);
@@ -35,6 +37,15 @@ function capstylus_clone_rewrite_mirror_html($html)
     $html = str_replace('action="/', 'action="' . $home_root, $html);
     $html = str_replace('src="//', 'src="https://', $html);
     $html = str_replace('href="//', 'href="https://', $html);
+    $html = str_replace('CapStylus', 'NEW ORDER', $html);
+    $html = str_replace('capstylus.com', wp_parse_url(home_url('/'), PHP_URL_HOST), $html);
+    $html = str_replace('order@capstylus.com', 'order@neworder.local', $html);
+    $html = preg_replace('/<title>.*?<\/title>/is', '<title>NEW ORDER | キャップ刺繍シミュレーター</title>', $html);
+    $html = preg_replace('/<meta property="og:site_name" content="[^"]*"\s*\/?>/i', '<meta property="og:site_name" content="NEW ORDER" />', $html);
+    $html = preg_replace('/<meta property="og:title" content="[^"]*"\s*\/?>/i', '<meta property="og:title" content="NEW ORDER | キャップ刺繍シミュレーター" />', $html);
+    $html = preg_replace('/<meta property="og:image" content="[^"]*"\s*\/?>/i', '<meta property="og:image" content="' . esc_url($logo_uri) . '" />', $html);
+    $html = preg_replace('/<link rel="shortcut icon"[^>]*>/i', '<link rel="shortcut icon" href="' . esc_url($favicon_uri) . '" type="image/png">', $html);
+    $html = preg_replace('/<link rel="apple-touch-icon-precomposed"[^>]*>/i', '<link rel="apple-touch-icon-precomposed" href="' . esc_url($favicon_uri) . '">', $html);
 
     return $html;
 }
@@ -86,6 +97,10 @@ function capstylus_clone_serve_mirror_pages()
 
     $request_uri  = isset($_SERVER['REQUEST_URI']) ? wp_unslash($_SERVER['REQUEST_URI']) : '/';
     $request_path = wp_parse_url($request_uri, PHP_URL_PATH);
+    if (trim((string) $request_path, '/') === 'simulator') {
+        return;
+    }
+
     if (! is_string($request_path)) {
         return;
     }

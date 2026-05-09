@@ -52,6 +52,14 @@ a {
   text-decoration: none;
   font-size: 1.25rem;
   font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+}
+
+.site-branding img {
+  display: block;
+  max-height: 46px;
+  width: auto;
 }
 
 .section {

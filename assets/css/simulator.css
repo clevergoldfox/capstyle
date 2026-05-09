@@ -1,0 +1,152 @@
+.neworder-simulator-page {
+  background: #0f1014;
+  color: #f3f4f6;
+  min-height: 100vh;
+  padding: 16px;
+}
+
+.neworder-simulator-layout {
+  max-width: 1320px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 18px;
+}
+
+.neworder-preview-panel,
+.neworder-controls {
+  background: #16181f;
+  border: 1px solid #2b2f3a;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.neworder-preview-panel h1 {
+  margin: 0 0 8px;
+  font-size: 1.4rem;
+}
+
+.neworder-preview-panel p {
+  margin: 0 0 14px;
+  color: #c4c7d0;
+}
+
+.neworder-canvas-wrap {
+  background: #0d0e11;
+  border: 1px solid #2b2f3a;
+  border-radius: 8px;
+  overflow: auto;
+}
+
+#neworder-simulator-canvas {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  background: linear-gradient(180deg, #20232b 0%, #15161d 100%);
+}
+
+.neworder-controls {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+}
+
+.neworder-controls label {
+  font-size: 0.85rem;
+  color: #c7ccd8;
+}
+
+.neworder-controls input,
+.neworder-controls select,
+.neworder-controls textarea,
+.neworder-controls button,
+.neworder-controls a {
+  width: 100%;
+}
+
+.neworder-controls input,
+.neworder-controls select,
+.neworder-controls textarea {
+  background: #101218;
+  border: 1px solid #303546;
+  color: #f3f4f6;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.neworder-controls textarea {
+  resize: vertical;
+  min-height: 120px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+}
+
+.neworder-controls button,
+.neworder-controls a {
+  border: 0;
+  border-radius: 9px;
+  background: #2563eb;
+  color: #fff;
+  padding: 11px;
+  text-decoration: none;
+  text-align: center;
+  cursor: pointer;
+}
+
+.neworder-color-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.neworder-color-swatch {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 999px;
+  border: 2px solid #33394a;
+  cursor: pointer;
+}
+
+.neworder-mobile-toggle {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .neworder-simulator-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .neworder-controls {
+    position: static;
+    max-height: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .neworder-simulator-page {
+    padding: 10px;
+  }
+
+  .neworder-mobile-toggle {
+    display: block;
+    margin: 0 auto 10px;
+    width: 100%;
+    border: 0;
+    border-radius: 8px;
+    background: #334155;
+    color: #fff;
+    padding: 10px;
+  }
+
+  .neworder-controls {
+    display: none;
+  }
+
+  .neworder-controls.is-open {
+    display: grid;
+  }
+}

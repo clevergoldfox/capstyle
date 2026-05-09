@@ -20,6 +20,7 @@ get_header();
   <div class="container">
     <h1><?php esc_html_e('Mirror not generated yet.', 'capstylus-clone'); ?></h1>
     <p><?php esc_html_e('Run the mirror refresh script from the project root to restore the site snapshot.', 'capstylus-clone'); ?></p>
+    <p><a href="<?php echo esc_url(home_url('/simulator/')); ?>"><?php esc_html_e('Open NEW ORDER Simulator', 'capstylus-clone'); ?></a></p>
   </div>
 </main>
 <?php

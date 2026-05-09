@@ -20,8 +20,8 @@ if (! defined('ABSPATH')) {
 
 <header class="site-header">
   <div class="container header-inner">
-    <a class="site-branding" href="<?php echo esc_url(home_url('/')); ?>">
-      <?php bloginfo('name'); ?>
+    <a class="site-branding" href="<?php echo esc_url(home_url('/')); ?>" aria-label="NEW ORDER">
+      <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo.png'); ?>" alt="NEW ORDER">
     </a>
   </div>
 </header>
