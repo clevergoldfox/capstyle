@@ -10,11 +10,31 @@
     }
   }
 
+  function ensureSubmitSpinner(btn) {
+    if (!btn || !btn.parentElement) {
+      return null;
+    }
+    var sp = btn.parentElement.querySelector('.neworder-submit-spinner');
+    if (!sp) {
+      sp = document.createElement('span');
+      sp.className = 'neworder-submit-spinner';
+      sp.setAttribute('role', 'status');
+      /* Decorative: progress is also exposed via submit aria-busy */
+      sp.setAttribute('aria-hidden', 'true');
+      btn.insertAdjacentElement('afterend', sp);
+    }
+    return sp;
+  }
+
   function setSending(formEl, submitting) {
     var btn = formEl.querySelector('[type="submit"]');
     if (btn) {
       btn.disabled = submitting;
       btn.setAttribute('aria-busy', submitting ? 'true' : 'false');
+      var sp = ensureSubmitSpinner(btn);
+      if (sp) {
+        sp.classList.toggle('is-active', submitting);
+      }
     }
   }
 
