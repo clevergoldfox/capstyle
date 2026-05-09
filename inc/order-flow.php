@@ -11,6 +11,65 @@ if (! defined('ABSPATH')) {
 
 const NEWORDER_ORDER_NONCE_ACTION = 'neworder_submit';
 
+/**
+ * Send via wp_mail and capture wp_mail_failed for debugging.
+ *
+ * @param string|array<string> $to      Recipient(s).
+ * @param string               $subject Subject.
+ * @param string               $body    Body.
+ * @param string|string[]      $headers Headers for wp_mail.
+ * @return array{sent: bool, error_message: string}
+ */
+function neworder_wp_mail_attempt($to, $subject, $body, $headers)
+{
+    $error_message = '';
+    $failure_cb    = static function (\WP_Error $wp_error) use (&$error_message) {
+        $error_message = $wp_error->get_error_message();
+    };
+
+    add_action('wp_mail_failed', $failure_cb, 10, 1);
+
+    try {
+        $sent = wp_mail($to, $subject, $body, $headers);
+    } catch (\Throwable $e) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement.DetectedCatch
+        $sent          = false;
+        $error_message = $e->getMessage();
+    }
+
+    remove_action('wp_mail_failed', $failure_cb, 10);
+
+    return array(
+        'sent'          => (bool) $sent,
+        'error_message' => $error_message,
+    );
+}
+
+/**
+ * Try twice with a short pause (some SMTP / PHPMailer combinations fail on back-to-back sends).
+ *
+ * @param string|array<string> $to Recipient(s).
+ * @param string               $subject Subject.
+ * @param string               $body Body.
+ * @param string|string[]      $headers Headers for wp_mail.
+ * @return array{sent: bool, error_message: string}
+ */
+function neworder_wp_mail_attempt_with_retry($to, $subject, $body, $headers)
+{
+    $attempt = neworder_wp_mail_attempt($to, $subject, $body, $headers);
+    if ($attempt['sent']) {
+        return $attempt;
+    }
+
+    usleep(300000); // 0.3s
+
+    $second = neworder_wp_mail_attempt($to, $subject, $body, $headers);
+
+    return array(
+        'sent'          => $second['sent'],
+        'error_message' => $second['error_message'] !== '' ? $second['error_message'] : $attempt['error_message'],
+    );
+}
+
 function neworder_register_order_rest_route()
 {
     register_rest_route(
@@ -196,32 +255,60 @@ function neworder_dispatch_order_request(array $params)
 
     $customer_subject = __('【NEW ORDER】注文を受け付けました', 'capstylus-clone');
     $customer_body    = neworder_build_customer_confirmation_body($your_name);
-    $customer_headers = array('Content-Type: text/plain; charset=UTF-8');
+    $customer_headers = array(
+        'Content-Type: text/plain; charset=UTF-8',
+        'Reply-To: ' . $admin_email,
+    );
 
     $admin_subject    = apply_filters('neworder_admin_email_subject', $admin_subject, $f);
     $customer_subject = apply_filters('neworder_customer_email_subject', $customer_subject, $f);
     $admin_body       = apply_filters('neworder_admin_email_body', $admin_body, $f);
     $customer_body    = apply_filters('neworder_customer_email_body', $customer_body, $f);
 
-    $admin_sent = wp_mail($admin_email, $admin_subject, $admin_body, $admin_headers);
-    $customer_sent = wp_mail($your_email, $customer_subject, $customer_body, $customer_headers);
+    $admin_result = neworder_wp_mail_attempt($admin_email, $admin_subject, $admin_body, $admin_headers);
 
-    if (! $admin_sent) {
+    if (! $admin_result['sent']) {
+        if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+            // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+            error_log('NEW ORDER: admin wp_mail failed: ' . $admin_result['error_message']);
+        }
+
         return new WP_REST_Response(
             array('success' => false, 'message' => __('管理者へのメール送信に失敗しました。時間をおいて再度お試しください。', 'capstylus-clone')),
             500
         );
     }
 
+    $customer_result = neworder_wp_mail_attempt_with_retry(
+        $your_email,
+        $customer_subject,
+        $customer_body,
+        $customer_headers
+    );
+    $customer_sent = $customer_result['sent'];
+
     if (! $customer_sent) {
-        do_action('neworder_customer_email_failed', $f);
+        do_action('neworder_customer_email_failed', $f, $customer_result['error_message']);
+        if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+            // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+            error_log(
+                'NEW ORDER: customer wp_mail failed (to ' . $your_email . '): ' . $customer_result['error_message']
+            );
+        }
     }
+
+    $message = $customer_sent
+        ? __('注文を送信しました。入力されたメールアドレスに確認メールをお送りします。', 'capstylus-clone')
+        : __(
+            '注文を受け付けました（管理者へ通知済みです）。自動返信メールが届かない場合は迷惑メールフォルダをご確認ください。メールプロバイダの「サンドボックス」や送信制限で外部アドレス宛の2通目が拒否されることもあります。',
+            'capstylus-clone'
+        );
 
     return new WP_REST_Response(
         array(
             'success'          => true,
             'customerMailSent' => (bool) $customer_sent,
-            'message'          => __('注文を送信しました。入力されたメールアドレスに確認メールをお送りします。', 'capstylus-clone'),
+            'message'          => $message,
         ),
         200
     );

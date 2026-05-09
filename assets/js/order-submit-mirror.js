@@ -101,9 +101,8 @@
               pack.body.message ||
               (success ? '送信しました。' : '送信に失敗しました。');
 
+            /* Partial success: order saved server-side but customer confirmation mail failed */
             if (success && pack.body.customerMailSent === false) {
-              msg +=
-                ' （確認メールの送信のみ失敗しました。管理者には届いている可能性があります。）';
               showMessage(out, msg, true);
               return;
             }
