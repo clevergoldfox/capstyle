@@ -59,6 +59,12 @@ function neworder_mirror_apply_content_filters($html)
     return $html;
 }
 
+function neworder_cf7_placeholder_loader_json_url()
+{
+    /* No HTTP request — avoids 404 when plugin images path differs from bundled mirror (e.g. images/ vs assets/). */
+    return 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+}
+
 function capstylus_clone_rewrite_mirror_html($html)
 {
     $mirror_uri = capstylus_clone_get_mirror_uri();
@@ -67,6 +73,29 @@ function capstylus_clone_rewrite_mirror_html($html)
     $logo_white_uri = get_template_directory_uri() . '/assets/images/logo-white.png';
     $favicon_uri = get_template_directory_uri() . '/assets/images/favicon.png';
     $legacy_mirror_uri = trailingslashit(home_url('/')) . 'wp-content/themes/capstyle/mirror';
+
+    /* Deprecated viewport form — Safari warns and truncates "320px" to a bogus width. */
+    $html = preg_replace(
+        '/<meta\s+name="viewport"\s+content="width=320px[^"]*"\s*\/?>/i',
+        '<meta name="viewport" content="width=device-width, initial-scale=1">',
+        $html
+    );
+
+    /*
+     * Inline CF7 localization uses JSON-style escapes for slashes: \"loaderUrl\":\"https:\\/\\/...\"
+     * Match the literal \/ after the colon (four backslashes in this PHP pattern).
+     */
+    $tiny_loader_json = '"' . neworder_cf7_placeholder_loader_json_url() . '"';
+    $html             = preg_replace(
+        '#"loaderUrl":"https:\\\\/\\\\/[^"]+"#',
+        '"loaderUrl":' . $tiny_loader_json,
+        $html
+    );
+    $html = preg_replace(
+        '#"loaderUrl":"http:\\\\/\\\\/[^"]+"#',
+        '"loaderUrl":' . $tiny_loader_json,
+        $html
+    );
 
     $html = str_replace('https://www.capstylus.com', $mirror_uri, $html);
     $html = str_replace('http://www.capstylus.com', $mirror_uri, $html);
