@@ -55,18 +55,56 @@ function neworder_wp_mail_attempt($to, $subject, $body, $headers)
  */
 function neworder_wp_mail_attempt_with_retry($to, $subject, $body, $headers)
 {
-    $attempt = neworder_wp_mail_attempt($to, $subject, $body, $headers);
-    if ($attempt['sent']) {
-        return $attempt;
+    return neworder_wp_mail_attempt_with_retries($to, $subject, $body, $headers, 2, array(300000));
+}
+
+/**
+ * Reset WordPress PHPMailer singleton before the next wp_mail() — avoids broken back-to-back sends with some SMTP plugins.
+ *
+ * Enabled by default between admin notification and customer confirmation only (see dispatch).
+ *
+ * @return void
+ */
+function neworder_wp_mail_force_new_phpmailer_instance()
+{
+    unset($GLOBALS['phpmailer']); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedGlobalFound
+}
+
+/**
+ * Retry wp_mail with configurable pauses and PHPMailer resets (each attempt uses a fresh singleton when reset is on).
+ *
+ * @param int   $max_attempts    Number of tries (min 1).
+ * @param array $delay_useconds  Pauses after failures: index 0 = after 1st failure, etc.
+ * @param bool  $reset_before_each When true, clears $phpmailer global before every attempt.
+ * @return array{sent: bool, error_message: string}
+ */
+function neworder_wp_mail_attempt_with_retries($to, $subject, $body, $headers, $max_attempts, array $delay_useconds, $reset_before_each = false)
+{
+    $max_attempts = max(1, (int) $max_attempts);
+
+    $last_error = '';
+    for ($i = 0; $i < $max_attempts; $i++) {
+        if ($reset_before_each) {
+            neworder_wp_mail_force_new_phpmailer_instance();
+        }
+        if ($i > 0) {
+            $pause = isset($delay_useconds[$i - 1]) ? (int) $delay_useconds[$i - 1] : 500000;
+            if ($pause > 0) {
+                usleep($pause);
+            }
+        }
+
+        $attempt = neworder_wp_mail_attempt($to, $subject, $body, $headers);
+        if ($attempt['sent']) {
+            return $attempt;
+        }
+
+        $last_error = $attempt['error_message'] !== '' ? $attempt['error_message'] : $last_error;
     }
 
-    usleep(300000); // 0.3s
-
-    $second = neworder_wp_mail_attempt($to, $subject, $body, $headers);
-
     return array(
-        'sent'          => $second['sent'],
-        'error_message' => $second['error_message'] !== '' ? $second['error_message'] : $attempt['error_message'],
+        'sent'          => false,
+        'error_message' => $last_error,
     );
 }
 
@@ -316,11 +354,36 @@ function neworder_dispatch_order_request(array $params)
         );
     }
 
-    $customer_result = neworder_wp_mail_attempt_with_retry(
+    /* Some SMTP transports fail the 2nd envelope on the same TCP session; reset + retry helps. */
+    if (apply_filters('neworder_reset_phpmailer_before_customer_mail', true)) {
+        neworder_wp_mail_force_new_phpmailer_instance();
+    }
+
+    $pause_after_admin = (int) apply_filters(
+        'neworder_pause_microseconds_between_admin_and_customer_mail',
+        500000
+    );
+    if ($pause_after_admin > 0) {
+        usleep(min($pause_after_admin, 2000000)); // cap 2s
+    }
+
+    $customer_attempts = max(1, min(5, (int) apply_filters('neworder_customer_confirmation_mail_max_attempts', 3)));
+    $retry_delays_usec = apply_filters(
+        'neworder_customer_confirmation_mail_retry_delays_useconds',
+        array(600000, 1200000)
+    );
+    if (! is_array($retry_delays_usec)) {
+        $retry_delays_usec = array(600000, 1200000);
+    }
+
+    $customer_result = neworder_wp_mail_attempt_with_retries(
         $your_email,
         $customer_subject,
         $customer_body,
-        $customer_headers
+        $customer_headers,
+        $customer_attempts,
+        $retry_delays_usec,
+        true
     );
     $customer_sent = $customer_result['sent'];
 
