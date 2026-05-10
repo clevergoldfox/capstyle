@@ -218,11 +218,104 @@ function neworder_build_customer_confirmation_body($name)
 {
     $salutation = ($name !== '') ? ($name . " 様\n\n") : '';
     return $salutation
-        . "ご注文を受け付けました。\n"
-        . "現在検討中なので、しばらくお待ちください。\n\n"
+        . "管理者側で注文を受け付けました。\n"
+        . "しばらくお待ちください。\n\n"
         . "---\n"
         . 'NEW ORDER';
 }
+
+/**
+ * Last-resort: send confirmation in a separate request (cron) when same-request delivery fails (common with some SMTP relays).
+ *
+ * @param string $your_email Recipient.
+ * @param string $subject    Subject line.
+ * @param string $body       Plain-text body (already finalized / filtered upstream).
+ * @param string $reply_to   Reply-To mailbox (typically admin inbox).
+ */
+function neworder_schedule_fallback_customer_confirmation_mail($your_email, $subject, $body, $reply_to)
+{
+    if (! apply_filters('neworder_schedule_fallback_customer_confirmation_mail', true)) {
+        return;
+    }
+
+    $your_email = sanitize_email((string) $your_email);
+    $reply_to   = sanitize_email((string) $reply_to);
+
+    if (! is_email($your_email) || ! is_email($reply_to)) {
+        return;
+    }
+
+    $delay = max(10, min(600, (int) apply_filters('neworder_customer_mail_fallback_delay_seconds', 30)));
+
+    wp_schedule_single_event(
+        time() + $delay,
+        'neworder_fallback_customer_confirmation_mail',
+        array(
+            $your_email,
+            (string) $subject,
+            (string) $body,
+            $reply_to,
+        )
+    );
+
+    if (apply_filters('neworder_fallback_customer_confirmation_spawn_cron', true) && function_exists('spawn_cron')) {
+        // phpcs:ignore WordPress.PHP.DevelopmentFunctions.prevent_path_disclosure_spawn_cron_ok
+        spawn_cron();
+    }
+}
+
+/**
+ * Cron callback — must match args scheduled in neworder_schedule_fallback_customer_confirmation_mail().
+ *
+ * @param string $your_email Recipient.
+ * @param string $subject    Subject line.
+ * @param string $body       Plain-text body.
+ * @param string $reply_to   Reply-To header value (email only).
+ */
+function neworder_run_fallback_customer_confirmation_mail($your_email, $subject, $body, $reply_to)
+{
+    if (! is_email($your_email) || ! is_email($reply_to)) {
+        return;
+    }
+
+    $headers = array(
+        'Content-Type: text/plain; charset=UTF-8',
+        'Reply-To: ' . $reply_to,
+    );
+
+    neworder_wp_mail_force_new_phpmailer_instance();
+
+    $attempts    = max(1, min(5, (int) apply_filters('neworder_fallback_customer_confirmation_mail_max_attempts', 3)));
+    $delay_usec  = apply_filters(
+        'neworder_fallback_customer_confirmation_mail_retry_delays_useconds',
+        array(600000, 1200000)
+    );
+
+    $result = neworder_wp_mail_attempt_with_retries(
+        $your_email,
+        sanitize_text_field($subject),
+        (string) $body,
+        $headers,
+        $attempts,
+        is_array($delay_usec) ? $delay_usec : array(600000, 1200000),
+        true
+    );
+
+    if (! $result['sent']) {
+        if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+            // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+            error_log(
+                'NEW ORDER: fallback cron customer wp_mail failed (to ' . $your_email . '): ' . $result['error_message']
+            );
+        }
+    }
+}
+add_action(
+    'neworder_fallback_customer_confirmation_mail',
+    'neworder_run_fallback_customer_confirmation_mail',
+    10,
+    4
+);
 
 /**
  * Shared order processor (REST JSON or admin-ajax $_POST).
@@ -340,32 +433,11 @@ function neworder_dispatch_order_request(array $params)
     $admin_body       = apply_filters('neworder_admin_email_body', $admin_body, $f);
     $customer_body    = apply_filters('neworder_customer_email_body', $customer_body, $f);
 
-    $admin_result = neworder_wp_mail_attempt($admin_email, $admin_subject, $admin_body, $admin_headers);
-
-    if (! $admin_result['sent']) {
-        if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
-            // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-            error_log('NEW ORDER: admin wp_mail failed: ' . $admin_result['error_message']);
-        }
-
-        return new WP_REST_Response(
-            array('success' => false, 'message' => __('管理者へのメール送信に失敗しました。時間をおいて再度お試しください。', 'capstylus-clone')),
-            500
-        );
-    }
-
-    /* Some SMTP transports fail the 2nd envelope on the same TCP session; reset + retry helps. */
-    if (apply_filters('neworder_reset_phpmailer_before_customer_mail', true)) {
-        neworder_wp_mail_force_new_phpmailer_instance();
-    }
-
-    $pause_after_admin = (int) apply_filters(
-        'neworder_pause_microseconds_between_admin_and_customer_mail',
-        500000
-    );
-    if ($pause_after_admin > 0) {
-        usleep(min($pause_after_admin, 2000000)); // cap 2s
-    }
+    /*
+     * Many SMTP setups deliver the first wp_mail and drop the second in the same request.
+     * Default: customer confirmation first, then admin notification (filter to restore old order).
+     */
+    $customer_first = apply_filters('neworder_send_customer_confirmation_before_admin', true);
 
     $customer_attempts = max(1, min(5, (int) apply_filters('neworder_customer_confirmation_mail_max_attempts', 3)));
     $retry_delays_usec = apply_filters(
@@ -376,23 +448,95 @@ function neworder_dispatch_order_request(array $params)
         $retry_delays_usec = array(600000, 1200000);
     }
 
-    $customer_result = neworder_wp_mail_attempt_with_retries(
-        $your_email,
-        $customer_subject,
-        $customer_body,
-        $customer_headers,
-        $customer_attempts,
-        $retry_delays_usec,
-        true
+    $pause_between = (int) apply_filters(
+        'neworder_pause_microseconds_between_admin_and_customer_mail',
+        500000
     );
-    $customer_sent = $customer_result['sent'];
+    $pause_between = min(max(0, $pause_between), 2000000);
+
+    $customer_sent = false;
+    $customer_err  = '';
+
+    if ($customer_first) {
+        neworder_wp_mail_force_new_phpmailer_instance();
+
+        $customer_result = neworder_wp_mail_attempt_with_retries(
+            $your_email,
+            $customer_subject,
+            $customer_body,
+            $customer_headers,
+            $customer_attempts,
+            $retry_delays_usec,
+            true
+        );
+
+        $customer_sent = $customer_result['sent'];
+        $customer_err  = $customer_result['error_message'];
+
+        if (apply_filters('neworder_reset_phpmailer_before_admin_mail', true)) {
+            neworder_wp_mail_force_new_phpmailer_instance();
+        }
+
+        if ($pause_between > 0) {
+            usleep($pause_between);
+        }
+    }
+
+    $admin_result = neworder_wp_mail_attempt($admin_email, $admin_subject, $admin_body, $admin_headers);
+
+    if (! $admin_result['sent']) {
+        if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+            // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+            error_log('NEW ORDER: admin wp_mail failed: ' . $admin_result['error_message']);
+        }
+
+        return new WP_REST_Response(
+            array(
+                'success'          => false,
+                'customerMailSent' => (bool) $customer_sent,
+                'message'          => __('管理者へのメール送信に失敗しました。時間をおいて再度お試しください。', 'capstylus-clone'),
+            ),
+            500
+        );
+    }
+
+    if (! $customer_first) {
+        if (apply_filters('neworder_reset_phpmailer_before_customer_mail', true)) {
+            neworder_wp_mail_force_new_phpmailer_instance();
+        }
+
+        if ($pause_between > 0) {
+            usleep($pause_between);
+        }
+
+        $customer_result = neworder_wp_mail_attempt_with_retries(
+            $your_email,
+            $customer_subject,
+            $customer_body,
+            $customer_headers,
+            $customer_attempts,
+            $retry_delays_usec,
+            true
+        );
+
+        $customer_sent = $customer_result['sent'];
+        $customer_err  = $customer_result['error_message'];
+    }
 
     if (! $customer_sent) {
-        do_action('neworder_customer_email_failed', $f, $customer_result['error_message']);
+        /* Same-request send failed — try again shortly in a separate request (cron). */
+        neworder_schedule_fallback_customer_confirmation_mail(
+            $your_email,
+            $customer_subject,
+            $customer_body,
+            $admin_email
+        );
+
+        do_action('neworder_customer_email_failed', $f, $customer_err);
         if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
             // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
             error_log(
-                'NEW ORDER: customer wp_mail failed (to ' . $your_email . '): ' . $customer_result['error_message']
+                'NEW ORDER: customer wp_mail failed (to ' . $your_email . '): ' . $customer_err . ' — scheduled cron retry'
             );
         }
     }
@@ -400,7 +544,7 @@ function neworder_dispatch_order_request(array $params)
     $message = $customer_sent
         ? __('注文を送信しました。入力されたメールアドレスに確認メールをお送りします。', 'capstylus-clone')
         : __(
-            '注文を受け付けました（管理者へ通知済みです）。自動返信メールが届かない場合は迷惑メールフォルダをご確認ください。メールプロバイダの「サンドボックス」や送信制限で外部アドレス宛の2通目が拒否されることもあります。',
+            '注文を受け付けました（管理者へ通知済みです）。確認メールの送信を自動で再試行していますので、数十秒〜数分ほどお待ちいただいても届かない場合は迷惑メールフォルダをご確認ください。',
             'capstylus-clone'
         );
 
