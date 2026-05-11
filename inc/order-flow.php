@@ -268,9 +268,12 @@ function neworder_build_customer_confirmation_body($name)
 
 /**
  * Headers for the customer auto-reply.
- * Optional From uses the site admin email (usually matches WP Mail SMTP’s verified sender).
  *
- * @param string $admin_reply_to Admin inbox for Reply-To.
+ * From should match the mailbox your SMTP provider signs (SPF/DKIM). Admin order mail uses
+ * `neworder_get_notification_email()` — default the customer From to that same address so filters
+ * do not see a mismatch (common spam cause when From was `get_option('admin_email')` e.g. Gmail).
+ *
+ * @param string $admin_reply_to Admin inbox for Reply-To (same as notification email in typical setup).
  * @return array<int, string>
  */
 function neworder_build_customer_confirmation_mail_headers($admin_reply_to)
@@ -282,7 +285,12 @@ function neworder_build_customer_confirmation_mail_headers($admin_reply_to)
         'Reply-To: ' . $admin_reply_to,
     );
 
-    $from = apply_filters('neworder_customer_confirmation_mail_from_email', get_option('admin_email'));
+    $default_from = neworder_get_notification_email();
+    if (! is_email($default_from)) {
+        $default_from = (string) get_option('admin_email');
+    }
+
+    $from = apply_filters('neworder_customer_confirmation_mail_from_email', $default_from);
     $from = sanitize_email((string) $from);
     if (is_email($from)) {
         $headers[] = 'From: NEW ORDER <' . $from . '>';
