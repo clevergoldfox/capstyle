@@ -1,6 +1,7 @@
 <?php
 /**
- * NEW ORDER: mirror form → email (admin notification + customer auto-reply).
+ * NEW ORDER: mirrored order modal → admin-ajax → wp_mail (admin + customer).
+ * Does not use Contact Form 7; deactivate that plugin if it is not needed elsewhere.
  *
  * @package capstylus-clone
  */

@@ -1,5 +1,5 @@
 /**
- * Hijack mirrored CF7 order form → JSON POST → NEW ORDER REST.
+ * Order modal (mirror): POST FormData → admin-ajax.php → wp_mail (admin + customer via theme PHP).
  */
 (function () {
   function parseResponseJson(resp, text) {
@@ -69,17 +69,18 @@
     }
 
     var form =
-      wrap.querySelector('form.wpcf7-form') || wrap.querySelector('form');
+      wrap.querySelector('form.neworder-order-form') || wrap.querySelector('form');
     if (!form) {
       return;
     }
 
-    var out = wrap.querySelector('.wpcf7-response-output') || wrap.querySelector('.order-response');
+    var out =
+      wrap.querySelector('.neworder-order-response') ||
+      wrap.querySelector('.order-response');
 
-    /**
-     * Contact Form 7 wires ajaxForm on this form too. Without stopping it, CF7 toggles ajax-loader /
-     * "送信中" while our fetch runs → stuck UI + 404 on ajax-loader.gif. Capture + stopImmediatePropagation
-     * runs before CF7's bubble-phase submit handler on the same form.
+    /*
+     * Capture phase: legacy CF7 snippets (if still present after deploy) attach submit handlers later;
+     * we must own submit for fetch-based delivery.
      */
     form.addEventListener(
       'submit',
