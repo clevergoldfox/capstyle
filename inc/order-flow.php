@@ -13,6 +13,47 @@ if (! defined('ABSPATH')) {
 const NEWORDER_ORDER_NONCE_ACTION = 'neworder_submit';
 
 /**
+ * Whether JSON responses may include a `mailProcessLog` array for the browser console (see order-submit-mirror.js).
+ *
+ * @return bool
+ */
+function neworder_should_include_mail_process_log()
+{
+    return (bool) apply_filters(
+        'neworder_include_mail_process_log_in_response',
+        defined('WP_DEBUG') && WP_DEBUG
+    );
+}
+
+/**
+ * @param array<int, array<string, mixed>> $log
+ */
+function neworder_mail_process_log_step(array &$log, float $t0, string $event, array $details = array())
+{
+    $row = array_merge(
+        array(
+            'event'     => (string) $event,
+            'elapsedMs' => (int) round((microtime(true) - $t0) * 1000),
+        ),
+        $details
+    );
+    $log[] = $row;
+}
+
+/**
+ * @param array<int, array<string, mixed>> $mail_log
+ * @return array<string, mixed>
+ */
+function neworder_order_payload_with_mail_log(array $payload, array $mail_log)
+{
+    if (neworder_should_include_mail_process_log() && $mail_log !== array()) {
+        $payload['mailProcessLog'] = $mail_log;
+    }
+
+    return $payload;
+}
+
+/**
  * Send via wp_mail and capture wp_mail_failed for debugging.
  *
  * @param string|array<string> $to      Recipient(s).
@@ -466,6 +507,9 @@ function neworder_dispatch_order_request(array $params)
         $f
     );
 
+    $mail_t0  = microtime(true);
+    $mail_log = array();
+
     /*
      * Many SMTP relays accept the first wp_mail in a request and silently drop (or falsify success on) the second.
      * Default: notify admin synchronously; deliver the shopper mail in a NEW HTTP request via WP Cron.
@@ -473,14 +517,37 @@ function neworder_dispatch_order_request(array $params)
      */
     $defer_customer = apply_filters('neworder_defer_customer_confirmation_to_wp_cron', true);
 
+    neworder_mail_process_log_step(
+        $mail_log,
+        $mail_t0,
+        'config',
+        array(
+            'deferCustomerToCron' => (bool) $defer_customer,
+        )
+    );
+
     $customer_sent  = false;
     $customer_queued = false;
     $customer_err    = '';
 
     if ($defer_customer) {
+        neworder_mail_process_log_step($mail_log, $mail_t0, 'admin_wp_mail_start', array('role' => 'admin_notification'));
+
         neworder_wp_mail_force_new_phpmailer_instance();
 
         $admin_result = neworder_wp_mail_attempt($admin_email, $admin_subject, $admin_body, $admin_headers);
+
+        neworder_mail_process_log_step(
+            $mail_log,
+            $mail_t0,
+            'admin_wp_mail_done',
+            array(
+                'sent'  => (bool) $admin_result['sent'],
+                'error' => $admin_result['error_message'] !== ''
+                    ? substr($admin_result['error_message'], 0, 200)
+                    : '',
+            )
+        );
 
         if (! $admin_result['sent']) {
             if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
@@ -489,11 +556,14 @@ function neworder_dispatch_order_request(array $params)
             }
 
             return new WP_REST_Response(
-                array(
-                    'success'          => false,
-                    'customerMailSent' => false,
-                    'customerMailQueued' => false,
-                    'message'          => __('管理者へのメール送信に失敗しました。時間をおいて再度お試しください。', 'capstylus-clone'),
+                neworder_order_payload_with_mail_log(
+                    array(
+                        'success'              => false,
+                        'customerMailSent'     => false,
+                        'customerMailQueued'   => false,
+                        'message'              => __('管理者へのメール送信に失敗しました。時間をおいて再度お試しください。', 'capstylus-clone'),
+                    ),
+                    $mail_log
                 ),
                 500
             );
@@ -508,6 +578,15 @@ function neworder_dispatch_order_request(array $params)
 
         $customer_queued = true;
 
+        neworder_mail_process_log_step(
+            $mail_log,
+            $mail_t0,
+            'customer_confirmation_queued_wp_cron',
+            array(
+                'approxDelaySeconds' => max(5, min(600, (int) apply_filters('neworder_customer_mail_fallback_delay_seconds', 20))),
+            )
+        );
+
         if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
             // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
             error_log(
@@ -516,14 +595,17 @@ function neworder_dispatch_order_request(array $params)
         }
 
         return new WP_REST_Response(
-            array(
-                'success'            => true,
-                'customerMailSent'     => false,
-                'customerMailQueued'   => true,
-                'message'              => __(
-                    '注文を受け付けました。ご登録のメールアドレス宛に確認メールをまもなくお送りします。届かない場合は迷惑メールフォルダをご確認いただくか、1〜数分ほどお待ちください。',
-                    'capstylus-clone'
+            neworder_order_payload_with_mail_log(
+                array(
+                    'success'              => true,
+                    'customerMailSent'     => false,
+                    'customerMailQueued'   => true,
+                    'message'              => __(
+                        '注文を受け付けました。ご登録のメールアドレス宛に確認メールをまもなくお送りします。届かない場合は迷惑メールフォルダをご確認いただくか、1〜数分ほどお待ちください。',
+                        'capstylus-clone'
+                    ),
                 ),
+                $mail_log
             ),
             200
         );
@@ -531,7 +613,16 @@ function neworder_dispatch_order_request(array $params)
 
     /* ---------- Legacy same-request behaviour (SMTP must accept two mails in one request) ---------- */
 
+    neworder_mail_process_log_step($mail_log, $mail_t0, 'legacy_same_request_pipeline', array());
+
     $customer_first = apply_filters('neworder_send_customer_confirmation_before_admin', false);
+
+    neworder_mail_process_log_step(
+        $mail_log,
+        $mail_t0,
+        'legacy_order',
+        array('customerMailBeforeAdmin' => (bool) $customer_first)
+    );
 
     $customer_attempts = max(1, min(5, (int) apply_filters('neworder_customer_confirmation_mail_max_attempts', 3)));
     $retry_delays_usec = apply_filters(
@@ -549,6 +640,8 @@ function neworder_dispatch_order_request(array $params)
     $pause_between = min(max(0, $pause_between), 2000000);
 
     if ($customer_first) {
+        neworder_mail_process_log_step($mail_log, $mail_t0, 'customer_wp_mail_start', array('role' => 'customer_confirmation'));
+
         neworder_wp_mail_force_new_phpmailer_instance();
 
         $customer_result = neworder_wp_mail_attempt_with_retries(
@@ -564,6 +657,16 @@ function neworder_dispatch_order_request(array $params)
         $customer_sent = $customer_result['sent'];
         $customer_err  = $customer_result['error_message'];
 
+        neworder_mail_process_log_step(
+            $mail_log,
+            $mail_t0,
+            'customer_wp_mail_done',
+            array(
+                'sent'  => (bool) $customer_sent,
+                'error' => $customer_err !== '' ? substr($customer_err, 0, 200) : '',
+            )
+        );
+
         if (apply_filters('neworder_reset_phpmailer_before_admin_mail', true)) {
             neworder_wp_mail_force_new_phpmailer_instance();
         }
@@ -573,7 +676,21 @@ function neworder_dispatch_order_request(array $params)
         }
     }
 
+    neworder_mail_process_log_step($mail_log, $mail_t0, 'admin_wp_mail_start', array('role' => 'admin_notification'));
+
     $admin_result = neworder_wp_mail_attempt($admin_email, $admin_subject, $admin_body, $admin_headers);
+
+    neworder_mail_process_log_step(
+        $mail_log,
+        $mail_t0,
+        'admin_wp_mail_done',
+        array(
+            'sent'  => (bool) $admin_result['sent'],
+            'error' => $admin_result['error_message'] !== ''
+                ? substr($admin_result['error_message'], 0, 200)
+                : '',
+        )
+    );
 
     if (! $admin_result['sent']) {
         if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
@@ -582,11 +699,14 @@ function neworder_dispatch_order_request(array $params)
         }
 
         return new WP_REST_Response(
-            array(
-                'success'            => false,
-                'customerMailSent'     => (bool) $customer_sent,
-                'customerMailQueued'   => false,
-                'message'              => __('管理者へのメール送信に失敗しました。時間をおいて再度お試しください。', 'capstylus-clone'),
+            neworder_order_payload_with_mail_log(
+                array(
+                    'success'              => false,
+                    'customerMailSent'     => (bool) $customer_sent,
+                    'customerMailQueued'   => false,
+                    'message'              => __('管理者へのメール送信に失敗しました。時間をおいて再度お試しください。', 'capstylus-clone'),
+                ),
+                $mail_log
             ),
             500
         );
@@ -601,6 +721,8 @@ function neworder_dispatch_order_request(array $params)
             usleep($pause_between);
         }
 
+        neworder_mail_process_log_step($mail_log, $mail_t0, 'customer_wp_mail_start', array('role' => 'customer_confirmation'));
+
         $customer_result = neworder_wp_mail_attempt_with_retries(
             $your_email,
             $customer_subject,
@@ -613,6 +735,16 @@ function neworder_dispatch_order_request(array $params)
 
         $customer_sent = $customer_result['sent'];
         $customer_err  = $customer_result['error_message'];
+
+        neworder_mail_process_log_step(
+            $mail_log,
+            $mail_t0,
+            'customer_wp_mail_done',
+            array(
+                'sent'  => (bool) $customer_sent,
+                'error' => $customer_err !== '' ? substr($customer_err, 0, 200) : '',
+            )
+        );
     }
 
     if (! $customer_sent) {
@@ -623,6 +755,8 @@ function neworder_dispatch_order_request(array $params)
             $admin_email
         );
 
+        neworder_mail_process_log_step($mail_log, $mail_t0, 'customer_confirmation_queued_wp_cron_fallback', array());
+
         do_action('neworder_customer_email_failed', $f, $customer_err);
         if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
             // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
@@ -630,6 +764,8 @@ function neworder_dispatch_order_request(array $params)
                 'NEW ORDER: customer wp_mail failed (to ' . $your_email . '): ' . $customer_err . ' — scheduled cron retry'
             );
         }
+    } else {
+        neworder_mail_process_log_step($mail_log, $mail_t0, 'customer_mail_ok_same_request', array());
     }
 
     $message = $customer_sent
@@ -640,11 +776,14 @@ function neworder_dispatch_order_request(array $params)
         );
 
     return new WP_REST_Response(
-        array(
-            'success'            => true,
-            'customerMailSent'     => (bool) $customer_sent,
-            'customerMailQueued'   => false,
-            'message'              => $message,
+        neworder_order_payload_with_mail_log(
+            array(
+                'success'              => true,
+                'customerMailSent'     => (bool) $customer_sent,
+                'customerMailQueued'   => false,
+                'message'              => $message,
+            ),
+            $mail_log
         ),
         200
     );
@@ -658,9 +797,10 @@ function neworder_mirror_append_order_submit_script($html)
 
     $config = wp_json_encode(
         array(
-            'ajaxUrl'  => esc_url_raw(admin_url('admin-ajax.php')),
-            'endpoint' => esc_url_raw(rest_url('neworder/v1/order')),
-            'nonce'    => wp_create_nonce(NEWORDER_ORDER_NONCE_ACTION),
+            'ajaxUrl'             => esc_url_raw(admin_url('admin-ajax.php')),
+            'endpoint'            => esc_url_raw(rest_url('neworder/v1/order')),
+            'nonce'               => wp_create_nonce(NEWORDER_ORDER_NONCE_ACTION),
+            'mailProcessLogClient' => neworder_should_include_mail_process_log(),
         ),
         JSON_UNESCAPED_SLASHES
     );

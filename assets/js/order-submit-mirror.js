@@ -38,6 +38,39 @@
     }
   }
 
+  function logMailProcessToConsole(cfg, body) {
+    if (!cfg || !cfg.mailProcessLogClient || !body || !body.mailProcessLog) {
+      return;
+    }
+    var rows = body.mailProcessLog;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return;
+    }
+    try {
+      console.groupCollapsed('[NEW ORDER] mail process (server)');
+      rows.forEach(function (row) {
+        var ms = row && typeof row.elapsedMs !== 'undefined' ? row.elapsedMs : '';
+        var ev = row && row.event ? row.event : '';
+        var rest = {};
+        if (row && typeof row === 'object') {
+          Object.keys(row).forEach(function (k) {
+            if (k !== 'event' && k !== 'elapsedMs') {
+              rest[k] = row[k];
+            }
+          });
+        }
+        if (Object.keys(rest).length) {
+          console.log('+' + ms + 'ms', ev, rest);
+        } else {
+          console.log('+' + ms + 'ms', ev);
+        }
+      });
+      console.groupEnd();
+    } catch (_e) {
+      /* ignore */
+    }
+  }
+
   function showMessage(box, text, isError) {
     if (!box) {
       window.alert(text);
@@ -138,6 +171,8 @@
                 );
                 return;
               }
+
+              logMailProcessToConsole(cfg, pack.body);
 
             var success = !!pack.body.success;
             var msg =
