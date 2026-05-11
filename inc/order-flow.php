@@ -332,6 +332,78 @@ function neworder_schedule_fallback_customer_confirmation_mail($your_email, $sub
 }
 
 /**
+ * Send customer confirmation after the HTTP response is finished (admin-ajax JSON already sent).
+ * Avoids relying on WP-Cron (often disabled or never triggered on low-traffic sites).
+ *
+ * @param string               $to              Customer email.
+ * @param string               $subject         Subject.
+ * @param string               $body            Body.
+ * @param string[]|string      $headers         Same shape as wp_mail $headers.
+ * @param string               $admin_for_cron  Admin mailbox for Reply-To when scheduling cron backup.
+ */
+function neworder_register_customer_confirmation_on_shutdown($to, $subject, $body, $headers, $admin_for_cron)
+{
+    if (! apply_filters('neworder_send_customer_confirmation_on_shutdown', true)) {
+        return;
+    }
+
+    $to              = sanitize_email((string) $to);
+    $admin_for_cron = sanitize_email((string) $admin_for_cron);
+    $subject         = (string) $subject;
+    $body            = (string) $body;
+    if (! is_array($headers)) {
+        $headers = array($headers);
+    }
+
+    if (! is_email($to) || ! is_email($admin_for_cron)) {
+        return;
+    }
+
+    add_action(
+        'shutdown',
+        static function () use ($to, $subject, $body, $headers, $admin_for_cron) {
+            $pause = (int) apply_filters('neworder_shutdown_customer_mail_pause_microseconds', 400000);
+            if ($pause > 0) {
+                usleep(min(max(0, $pause), 2000000));
+            }
+
+            neworder_wp_mail_force_new_phpmailer_instance();
+
+            $attempts = max(1, min(5, (int) apply_filters('neworder_shutdown_customer_mail_max_attempts', 4)));
+            $delays   = apply_filters(
+                'neworder_shutdown_customer_mail_retry_delays_useconds',
+                array(500000, 1000000, 1500000)
+            );
+            if (! is_array($delays)) {
+                $delays = array(500000, 1000000, 1500000);
+            }
+
+            $result = neworder_wp_mail_attempt_with_retries(
+                $to,
+                wp_strip_all_tags($subject),
+                $body,
+                $headers,
+                $attempts,
+                $delays,
+                true
+            );
+
+            if (! $result['sent'] && defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+                error_log(
+                    'NEW ORDER: shutdown customer wp_mail failed (to ' . $to . '): ' . $result['error_message']
+                );
+            }
+
+            if (! $result['sent'] && apply_filters('neworder_schedule_cron_if_shutdown_customer_mail_fails', true)) {
+                neworder_schedule_fallback_customer_confirmation_mail($to, $subject, $body, $admin_for_cron);
+            }
+        },
+        999
+    );
+}
+
+/**
  * Cron callback — must match args scheduled in neworder_schedule_fallback_customer_confirmation_mail().
  *
  * @param string $your_email Recipient.
@@ -511,9 +583,9 @@ function neworder_dispatch_order_request(array $params)
     $mail_log = array();
 
     /*
-     * Many SMTP relays accept the first wp_mail in a request and silently drop (or falsify success on) the second.
-     * Default: notify admin synchronously; deliver the shopper mail in a NEW HTTP request via WP Cron.
-     * Filters: `neworder_defer_customer_confirmation_to_wp_cron` (bool, default true) and scheduling helpers exist below.
+     * Many SMTP relays drop the second wp_mail if fired back-to-back in the same "phase" as the admin mail.
+     * Default: admin mail in this request; customer mail on `shutdown` after JSON is sent (no dependency on WP-Cron).
+     * Set filter `neworder_defer_customer_confirmation_to_wp_cron` false for legacy inline two-mail mode.
      */
     $defer_customer = apply_filters('neworder_defer_customer_confirmation_to_wp_cron', true);
 
@@ -569,28 +641,32 @@ function neworder_dispatch_order_request(array $params)
             );
         }
 
-        neworder_schedule_fallback_customer_confirmation_mail(
+        neworder_register_customer_confirmation_on_shutdown(
             $your_email,
             $customer_subject,
             $customer_body,
+            $customer_headers,
             $admin_email
         );
 
         $customer_queued = true;
 
+        $pause_usec = (int) apply_filters('neworder_shutdown_customer_mail_pause_microseconds', 400000);
+        $pause_usec = min(max(0, $pause_usec), 2000000);
+
         neworder_mail_process_log_step(
             $mail_log,
             $mail_t0,
-            'customer_confirmation_queued_wp_cron',
+            'customer_confirmation_registered_shutdown',
             array(
-                'approxDelaySeconds' => max(5, min(600, (int) apply_filters('neworder_customer_mail_fallback_delay_seconds', 20))),
+                'pauseMsBeforeSend' => (int) round($pause_usec / 1000),
             )
         );
 
         if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
             // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
             error_log(
-                'NEW ORDER: customer confirmation queued for cron (to ' . $your_email . ') after successful admin wp_mail.'
+                'NEW ORDER: customer confirmation registered on shutdown (to ' . $your_email . ') after successful admin wp_mail.'
             );
         }
 
@@ -601,7 +677,7 @@ function neworder_dispatch_order_request(array $params)
                     'customerMailSent'     => false,
                     'customerMailQueued'   => true,
                     'message'              => __(
-                        '注文を受け付けました。ご登録のメールアドレス宛に確認メールをまもなくお送りします。届かない場合は迷惑メールフォルダをご確認いただくか、1〜数分ほどお待ちください。',
+                        '注文を受け付けました。ご登録のメールアドレス宛に確認メールを送信しています（数秒以内）。届かない場合は迷惑メールフォルダをご確認ください。',
                         'capstylus-clone'
                     ),
                 ),
