@@ -226,6 +226,31 @@ function neworder_build_customer_confirmation_body($name)
 }
 
 /**
+ * Headers for the customer auto-reply.
+ * Optional From uses the site admin email (usually matches WP Mail SMTP’s verified sender).
+ *
+ * @param string $admin_reply_to Admin inbox for Reply-To.
+ * @return array<int, string>
+ */
+function neworder_build_customer_confirmation_mail_headers($admin_reply_to)
+{
+    $admin_reply_to = sanitize_email((string) $admin_reply_to);
+
+    $headers = array(
+        'Content-Type: text/plain; charset=UTF-8',
+        'Reply-To: ' . $admin_reply_to,
+    );
+
+    $from = apply_filters('neworder_customer_confirmation_mail_from_email', get_option('admin_email'));
+    $from = sanitize_email((string) $from);
+    if (is_email($from)) {
+        $headers[] = 'From: NEW ORDER <' . $from . '>';
+    }
+
+    return $headers;
+}
+
+/**
  * Last-resort: send confirmation in a separate request (cron) when same-request delivery fails (common with some SMTP relays).
  *
  * @param string $your_email Recipient.
@@ -246,7 +271,7 @@ function neworder_schedule_fallback_customer_confirmation_mail($your_email, $sub
         return;
     }
 
-    $delay = max(10, min(600, (int) apply_filters('neworder_customer_mail_fallback_delay_seconds', 30)));
+    $delay = max(5, min(600, (int) apply_filters('neworder_customer_mail_fallback_delay_seconds', 20)));
 
     wp_schedule_single_event(
         time() + $delay,
@@ -279,22 +304,25 @@ function neworder_run_fallback_customer_confirmation_mail($your_email, $subject,
         return;
     }
 
-    $headers = array(
-        'Content-Type: text/plain; charset=UTF-8',
-        'Reply-To: ' . $reply_to,
+    $headers = apply_filters(
+        'neworder_customer_confirmation_mail_headers',
+        neworder_build_customer_confirmation_mail_headers($reply_to),
+        $your_email,
+        $reply_to,
+        null
     );
 
     neworder_wp_mail_force_new_phpmailer_instance();
 
-    $attempts    = max(1, min(5, (int) apply_filters('neworder_fallback_customer_confirmation_mail_max_attempts', 3)));
+    $attempts    = max(1, min(5, (int) apply_filters('neworder_fallback_customer_confirmation_mail_max_attempts', 5)));
     $delay_usec  = apply_filters(
         'neworder_fallback_customer_confirmation_mail_retry_delays_useconds',
-        array(600000, 1200000)
+        array(400000, 800000, 1200000)
     );
 
     $result = neworder_wp_mail_attempt_with_retries(
         $your_email,
-        sanitize_text_field($subject),
+        wp_strip_all_tags((string) $subject),
         (string) $body,
         $headers,
         $attempts,
@@ -424,21 +452,86 @@ function neworder_dispatch_order_request(array $params)
 
     $customer_subject = __('【NEW ORDER】注文を受け付けました', 'capstylus-clone');
     $customer_body    = neworder_build_customer_confirmation_body($your_name);
-    $customer_headers = array(
-        'Content-Type: text/plain; charset=UTF-8',
-        'Reply-To: ' . $admin_email,
-    );
 
     $admin_subject    = apply_filters('neworder_admin_email_subject', $admin_subject, $f);
     $customer_subject = apply_filters('neworder_customer_email_subject', $customer_subject, $f);
     $admin_body       = apply_filters('neworder_admin_email_body', $admin_body, $f);
     $customer_body    = apply_filters('neworder_customer_email_body', $customer_body, $f);
 
+    $customer_headers = apply_filters(
+        'neworder_customer_confirmation_mail_headers',
+        neworder_build_customer_confirmation_mail_headers($admin_email),
+        $your_email,
+        $admin_email,
+        $f
+    );
+
     /*
-     * Many SMTP setups deliver the first wp_mail and drop the second in the same request.
-     * Default: customer confirmation first, then admin notification (filter to restore old order).
+     * Many SMTP relays accept the first wp_mail in a request and silently drop (or falsify success on) the second.
+     * Default: notify admin synchronously; deliver the shopper mail in a NEW HTTP request via WP Cron.
+     * Filters: `neworder_defer_customer_confirmation_to_wp_cron` (bool, default true) and scheduling helpers exist below.
      */
-    $customer_first = apply_filters('neworder_send_customer_confirmation_before_admin', true);
+    $defer_customer = apply_filters('neworder_defer_customer_confirmation_to_wp_cron', true);
+
+    $customer_sent  = false;
+    $customer_queued = false;
+    $customer_err    = '';
+
+    if ($defer_customer) {
+        neworder_wp_mail_force_new_phpmailer_instance();
+
+        $admin_result = neworder_wp_mail_attempt($admin_email, $admin_subject, $admin_body, $admin_headers);
+
+        if (! $admin_result['sent']) {
+            if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+                // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+                error_log('NEW ORDER: admin wp_mail failed: ' . $admin_result['error_message']);
+            }
+
+            return new WP_REST_Response(
+                array(
+                    'success'          => false,
+                    'customerMailSent' => false,
+                    'customerMailQueued' => false,
+                    'message'          => __('管理者へのメール送信に失敗しました。時間をおいて再度お試しください。', 'capstylus-clone'),
+                ),
+                500
+            );
+        }
+
+        neworder_schedule_fallback_customer_confirmation_mail(
+            $your_email,
+            $customer_subject,
+            $customer_body,
+            $admin_email
+        );
+
+        $customer_queued = true;
+
+        if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+            // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+            error_log(
+                'NEW ORDER: customer confirmation queued for cron (to ' . $your_email . ') after successful admin wp_mail.'
+            );
+        }
+
+        return new WP_REST_Response(
+            array(
+                'success'            => true,
+                'customerMailSent'     => false,
+                'customerMailQueued'   => true,
+                'message'              => __(
+                    '注文を受け付けました。ご登録のメールアドレス宛に確認メールをまもなくお送りします。届かない場合は迷惑メールフォルダをご確認いただくか、1〜数分ほどお待ちください。',
+                    'capstylus-clone'
+                ),
+            ),
+            200
+        );
+    }
+
+    /* ---------- Legacy same-request behaviour (SMTP must accept two mails in one request) ---------- */
+
+    $customer_first = apply_filters('neworder_send_customer_confirmation_before_admin', false);
 
     $customer_attempts = max(1, min(5, (int) apply_filters('neworder_customer_confirmation_mail_max_attempts', 3)));
     $retry_delays_usec = apply_filters(
@@ -454,9 +547,6 @@ function neworder_dispatch_order_request(array $params)
         500000
     );
     $pause_between = min(max(0, $pause_between), 2000000);
-
-    $customer_sent = false;
-    $customer_err  = '';
 
     if ($customer_first) {
         neworder_wp_mail_force_new_phpmailer_instance();
@@ -493,9 +583,10 @@ function neworder_dispatch_order_request(array $params)
 
         return new WP_REST_Response(
             array(
-                'success'          => false,
-                'customerMailSent' => (bool) $customer_sent,
-                'message'          => __('管理者へのメール送信に失敗しました。時間をおいて再度お試しください。', 'capstylus-clone'),
+                'success'            => false,
+                'customerMailSent'     => (bool) $customer_sent,
+                'customerMailQueued'   => false,
+                'message'              => __('管理者へのメール送信に失敗しました。時間をおいて再度お試しください。', 'capstylus-clone'),
             ),
             500
         );
@@ -525,7 +616,6 @@ function neworder_dispatch_order_request(array $params)
     }
 
     if (! $customer_sent) {
-        /* Same-request send failed — try again shortly in a separate request (cron). */
         neworder_schedule_fallback_customer_confirmation_mail(
             $your_email,
             $customer_subject,
@@ -551,9 +641,10 @@ function neworder_dispatch_order_request(array $params)
 
     return new WP_REST_Response(
         array(
-            'success'          => true,
-            'customerMailSent' => (bool) $customer_sent,
-            'message'          => $message,
+            'success'            => true,
+            'customerMailSent'     => (bool) $customer_sent,
+            'customerMailQueued'   => false,
+            'message'              => $message,
         ),
         200
     );
