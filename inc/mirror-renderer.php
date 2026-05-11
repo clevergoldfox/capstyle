@@ -59,10 +59,39 @@ function neworder_mirror_apply_content_filters($html)
     return $html;
 }
 
-function neworder_cf7_placeholder_loader_json_url()
+/**
+ * Order emails are handled by NEW ORDER (`order-flow.php` + WP Mail SMTP), not Contact Form 7.
+ * Strip CF7 JS and hidden tags from mirrored snapshots so pages work with the CF7 plugin deactivated.
+ *
+ * @param string $html Rewritten mirror HTML.
+ * @return string
+ */
+function neworder_mirror_remove_contact_form_seven($html)
 {
-    /* No HTTP request — avoids 404 when plugin images path differs from bundled mirror (e.g. images/ vs assets/). */
-    return 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    /* <link> tags that load CF7 CSS from the plugin (not needed when CF7 is deactivated). */
+    $html = preg_replace('#<link\b(?=[^>]*\bcontact-form-7\b)[^>]*>#i', '', $html);
+
+    /* External CF7 bundles (mirror often still points at /wp-content/plugins/contact-form-7/…). */
+    $html = preg_replace('#<script[^>]+src\s*=\s*[\'"][^\'"]*contact-form-7[^\'"]*[\'"][^>]*>\s*</script>#i', '', $html);
+    /* Inline localization consumed by CF7 scripts.js */
+    $html = preg_replace('#<script[^>]*>[\s\S]*?\bvar\s+_wpcf7\b\s*=.*?<\s*/\s*script\s*>#i', '', $html);
+
+    /*
+     * Stale nonce + CF7 unit fields — submitting them can confuse admins; AJAX handler sets a fresh nonce in JS.
+     */
+    $html = preg_replace(
+        '#<div style="display:\s*none;">\s*<input[^>]*name="_wpcf7"[^>]*>[\s\S]*?</div>#i',
+        '',
+        $html
+    );
+
+    /* Plain form class for order-submit-mirror.js (no CF7 ajaxForm). */
+    $html = preg_replace('/<form([^>]*)\bclass="wpcf7-form"([^>]*)>/i', '<form$1class="neworder-order-form"$2>', $html);
+    /* Message target (keep .formWrap styles that key off descendant structure). */
+    $html = str_replace('wpcf7-response-output', 'neworder-order-response order-response', $html);
+    $html = preg_replace('/\s*wpcf7-display-none/', '', $html);
+
+    return $html;
 }
 
 function capstylus_clone_rewrite_mirror_html($html)
@@ -74,26 +103,9 @@ function capstylus_clone_rewrite_mirror_html($html)
     $favicon_uri = get_template_directory_uri() . '/assets/images/favicon.png';
     $legacy_mirror_uri = trailingslashit(home_url('/')) . 'wp-content/themes/capstyle/mirror';
 
-    /* Deprecated viewport form — Safari warns and truncates "320px" to a bogus width. */
     $html = preg_replace(
         '/<meta\s+name="viewport"\s+content="width=320px[^"]*"\s*\/?>/i',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
-        $html
-    );
-
-    /*
-     * Inline CF7 localization uses JSON-style escapes for slashes: \"loaderUrl\":\"https:\\/\\/...\"
-     * Match the literal \/ after the colon (four backslashes in this PHP pattern).
-     */
-    $tiny_loader_json = '"' . neworder_cf7_placeholder_loader_json_url() . '"';
-    $html             = preg_replace(
-        '#"loaderUrl":"https:\\\\/\\\\/[^"]+"#',
-        '"loaderUrl":' . $tiny_loader_json,
-        $html
-    );
-    $html = preg_replace(
-        '#"loaderUrl":"http:\\\\/\\\\/[^"]+"#',
-        '"loaderUrl":' . $tiny_loader_json,
         $html
     );
 
@@ -154,7 +166,11 @@ function capstylus_clone_rewrite_mirror_html($html)
     // Ensure white logo rendering on dark header areas.
     $html = str_replace(
         '</head>',
-        '<style>header h1 img[src*="/assets/images/logo-white.png"]{max-height:46px;width:auto;display:block}.site-branding img[src*="/assets/images/logo.png"]{max-height:46px;width:auto}</style></head>',
+        '<style>header h1 img[src*="/assets/images/logo-white.png"]{max-height:46px;width:auto;display:block}'
+        . '.site-branding img[src*="/assets/images/logo.png"]{max-height:46px;width:auto}'
+        . '.neworder-order-response{display:none;margin:12px 0;padding:12px;line-height:1.5;font-size:14px;border:1px solid #cfd4dc}'
+        . '.neworder-order-response.is-error{border-color:#c0392b;background:#fef2f2;color:#7f1d1d}'
+        . '</style></head>',
         $html
     );
 
@@ -168,7 +184,7 @@ function capstylus_clone_rewrite_mirror_html($html)
         $html = neworder_mirror_append_order_submit_script($html);
     }
 
-    return $html;
+    return neworder_mirror_remove_contact_form_seven($html);
 }
 
 function capstylus_clone_get_mirror_file_by_request($request_path)

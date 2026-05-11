@@ -1,5 +1,5 @@
 /**
- * Hijack mirrored CF7 order form → JSON POST → NEW ORDER REST.
+ * Order modal (mirror): POST FormData → admin-ajax.php → wp_mail (admin + customer via theme PHP).
  */
 (function () {
   function parseResponseJson(resp, text) {
@@ -38,6 +38,39 @@
     }
   }
 
+  function logMailProcessToConsole(cfg, body) {
+    if (!cfg || !cfg.mailProcessLogClient || !body || !body.mailProcessLog) {
+      return;
+    }
+    var rows = body.mailProcessLog;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return;
+    }
+    try {
+      console.groupCollapsed('[NEW ORDER] mail process (server)');
+      rows.forEach(function (row) {
+        var ms = row && typeof row.elapsedMs !== 'undefined' ? row.elapsedMs : '';
+        var ev = row && row.event ? row.event : '';
+        var rest = {};
+        if (row && typeof row === 'object') {
+          Object.keys(row).forEach(function (k) {
+            if (k !== 'event' && k !== 'elapsedMs') {
+              rest[k] = row[k];
+            }
+          });
+        }
+        if (Object.keys(rest).length) {
+          console.log('+' + ms + 'ms', ev, rest);
+        } else {
+          console.log('+' + ms + 'ms', ev);
+        }
+      });
+      console.groupEnd();
+    } catch (_e) {
+      /* ignore */
+    }
+  }
+
   function showMessage(box, text, isError) {
     if (!box) {
       window.alert(text);
@@ -69,17 +102,18 @@
     }
 
     var form =
-      wrap.querySelector('form.wpcf7-form') || wrap.querySelector('form');
+      wrap.querySelector('form.neworder-order-form') || wrap.querySelector('form');
     if (!form) {
       return;
     }
 
-    var out = wrap.querySelector('.wpcf7-response-output') || wrap.querySelector('.order-response');
+    var out =
+      wrap.querySelector('.neworder-order-response') ||
+      wrap.querySelector('.order-response');
 
-    /**
-     * Contact Form 7 wires ajaxForm on this form too. Without stopping it, CF7 toggles ajax-loader /
-     * "送信中" while our fetch runs → stuck UI + 404 on ajax-loader.gif. Capture + stopImmediatePropagation
-     * runs before CF7's bubble-phase submit handler on the same form.
+    /*
+     * Capture phase: legacy CF7 snippets (if still present after deploy) attach submit handlers later;
+     * we must own submit for fetch-based delivery.
      */
     form.addEventListener(
       'submit',
@@ -138,16 +172,28 @@
                 return;
               }
 
-              var success = !!pack.body.success;
-              var msg =
-                pack.body.message ||
-                (success ? '送信しました。' : '送信に失敗しました。');
+              logMailProcessToConsole(cfg, pack.body);
 
-              /* Partial success: order saved server-side but customer confirmation mail failed */
-              if (success && pack.body.customerMailSent === false) {
-                showMessage(out, msg, true);
-                return;
-              }
+            var success = !!pack.body.success;
+            var msg =
+              pack.body.message ||
+              (success ? '送信しました。' : '送信に失敗しました。');
+
+            /* Customer mail runs in WP Cron shortly after admin mail (SMTP-safe); not an error */
+            if (success && pack.body.customerMailQueued) {
+              showMessage(out, msg, false);
+              return;
+            }
+
+            /* Partial success: order saved server-side but customer confirmation mail failed */
+            if (
+              success &&
+              pack.body.customerMailSent === false &&
+              !pack.body.customerMailQueued
+            ) {
+              showMessage(out, msg, true);
+              return;
+            }
 
               showMessage(out, msg, !success || pack.status >= 400);
             })
