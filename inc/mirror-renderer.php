@@ -166,7 +166,13 @@ function capstylus_clone_rewrite_mirror_html($html)
     // Ensure white logo rendering on dark header areas.
     $html = str_replace(
         '</head>',
-        '<style>header h1 img[src*="/assets/images/logo-white.png"]{max-height:46px;width:auto;display:block}'
+        '<link rel="preconnect" href="https://fonts.googleapis.com">'
+        . '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+        . '<link href="https://fonts.googleapis.com/css2?family=Kosugi+Maru&family=Noto+Sans+JP:wght@400;700&family=Noto+Serif+JP:wght@400;600&display=swap" rel="stylesheet">'
+        . '<style>#character.font_heisei_gothic,.font_heisei_gothic .characterSelect{font-family:\'Noto Sans JP\',sans-serif;font-weight:700}'
+        . '#character.font_heisei_maru,.font_heisei_maru .characterSelect{font-family:\'Kosugi Maru\',sans-serif}'
+        . '#character.font_heisei_mincho,.font_heisei_mincho .characterSelect{font-family:\'Noto Serif JP\',serif;font-weight:600}'
+        . 'header h1 img[src*="/assets/images/logo-white.png"]{max-height:46px;width:auto;display:block}'
         . '.site-branding img[src*="/assets/images/logo.png"]{max-height:46px;width:auto}'
         . '.neworder-order-response{display:none;margin:12px 0;padding:12px;line-height:1.5;font-size:14px;border:1px solid #cfd4dc}'
         . '.neworder-order-response.is-error{border-color:#c0392b;background:#fef2f2;color:#7f1d1d}'
@@ -175,6 +181,19 @@ function capstylus_clone_rewrite_mirror_html($html)
     );
 
     $html = neworder_mirror_apply_content_filters($html);
+
+    $jp_font_radios = '<input type="radio" name="font" id="font_heisei_gothic" value="font_heisei_gothic">'
+        . '<label for="font_heisei_gothic" class="font_heisei_gothic"><span class="characterSelect">平成ゴシック</span></label>'
+        . '<input type="radio" name="font" id="font_heisei_maru" value="font_heisei_maru">'
+        . '<label for="font_heisei_maru" class="font_heisei_maru"><span class="characterSelect">平成丸ゴシック</span></label>'
+        . '<input type="radio" name="font" id="font_heisei_mincho" value="font_heisei_mincho">'
+        . '<label for="font_heisei_mincho" class="font_heisei_mincho"><span class="characterSelect">平成明朝</span></label>';
+
+    $html = preg_replace(
+        '#(<div class="fontBodyInner">\s*)<input\s+type="radio"\s+name="font"\s+id="font_colleges"#',
+        '$1' . $jp_font_radios . '<input type="radio" name="font" id="font_colleges"',
+        $html
+    );
 
     if (function_exists('neworder_mirror_replace_formwrap_with_cf7')) {
         $html = neworder_mirror_replace_formwrap_with_cf7($html);

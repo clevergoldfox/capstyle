@@ -141,12 +141,45 @@
             120000
           );
 
-          fetch(cfg.ajaxUrl, {
-            method: 'POST',
-            credentials: 'same-origin',
-            body: fd,
-            signal: controller ? controller.signal : undefined
-          })
+          var capEl = document.querySelector('.capWrap');
+          var previewPromise = Promise.resolve();
+          if (typeof window.html2canvas === 'function' && capEl) {
+            previewPromise = window
+              .html2canvas(capEl, {
+                scale: 1,
+                useCORS: true,
+                allowTaint: true,
+                logging: false,
+                backgroundColor: null
+              })
+              .then(function (canvas) {
+                try {
+                  if (!canvas) {
+                    return;
+                  }
+                  var dataUrl = canvas.toDataURL('image/jpeg', 0.72);
+                  var comma = dataUrl.indexOf(',');
+                  if (comma > 0) {
+                    fd.set('order_preview_png', dataUrl.slice(comma + 1));
+                  }
+                } catch (_cap) {
+                  /* ignore */
+                }
+              });
+          }
+
+          previewPromise
+            .catch(function () {
+              /* best-effort preview for order mail attachment */
+            })
+            .then(function () {
+              return fetch(cfg.ajaxUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                body: fd,
+                signal: controller ? controller.signal : undefined
+              });
+            })
             .then(function (resp) {
               return resp.text().then(function (text) {
                 return {
@@ -174,26 +207,26 @@
 
               logMailProcessToConsole(cfg, pack.body);
 
-            var success = !!pack.body.success;
-            var msg =
-              pack.body.message ||
-              (success ? '送信しました。' : '送信に失敗しました。');
+              var success = !!pack.body.success;
+              var msg =
+                pack.body.message ||
+                (success ? '送信しました。' : '送信に失敗しました。');
 
-            /* Customer mail runs in WP Cron shortly after admin mail (SMTP-safe); not an error */
-            if (success && pack.body.customerMailQueued) {
-              showMessage(out, msg, false);
-              return;
-            }
+              /* Customer mail runs in WP Cron shortly after admin mail (SMTP-safe); not an error */
+              if (success && pack.body.customerMailQueued) {
+                showMessage(out, msg, false);
+                return;
+              }
 
-            /* Partial success: order saved server-side but customer confirmation mail failed */
-            if (
-              success &&
-              pack.body.customerMailSent === false &&
-              !pack.body.customerMailQueued
-            ) {
-              showMessage(out, msg, true);
-              return;
-            }
+              /* Partial success: order saved server-side but customer confirmation mail failed */
+              if (
+                success &&
+                pack.body.customerMailSent === false &&
+                !pack.body.customerMailQueued
+              ) {
+                showMessage(out, msg, true);
+                return;
+              }
 
               showMessage(out, msg, !success || pack.status >= 400);
             })

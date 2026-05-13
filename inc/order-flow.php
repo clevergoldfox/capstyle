@@ -59,10 +59,11 @@ function neworder_order_payload_with_mail_log(array $payload, array $mail_log)
  * @param string|array<string> $to      Recipient(s).
  * @param string               $subject Subject.
  * @param string               $body    Body.
- * @param string|string[]      $headers Headers for wp_mail.
+ * @param string|string[]      $headers     Headers for wp_mail.
+ * @param array<int, string>   $attachments Absolute file paths for wp_mail attachments.
  * @return array{sent: bool, error_message: string}
  */
-function neworder_wp_mail_attempt($to, $subject, $body, $headers)
+function neworder_wp_mail_attempt($to, $subject, $body, $headers, array $attachments = array())
 {
     $error_message = '';
     $failure_cb    = static function (\WP_Error $wp_error) use (&$error_message) {
@@ -72,7 +73,7 @@ function neworder_wp_mail_attempt($to, $subject, $body, $headers)
     add_action('wp_mail_failed', $failure_cb, 10, 1);
 
     try {
-        $sent = wp_mail($to, $subject, $body, $headers);
+        $sent = wp_mail($to, $subject, $body, $headers, $attachments);
     } catch (\Throwable $e) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement.DetectedCatch
         $sent          = false;
         $error_message = $e->getMessage();
@@ -97,7 +98,7 @@ function neworder_wp_mail_attempt($to, $subject, $body, $headers)
  */
 function neworder_wp_mail_attempt_with_retry($to, $subject, $body, $headers)
 {
-    return neworder_wp_mail_attempt_with_retries($to, $subject, $body, $headers, 2, array(300000));
+    return neworder_wp_mail_attempt_with_retries($to, $subject, $body, $headers, 2, array(300000), false, array());
 }
 
 /**
@@ -118,9 +119,10 @@ function neworder_wp_mail_force_new_phpmailer_instance()
  * @param int   $max_attempts    Number of tries (min 1).
  * @param array $delay_useconds  Pauses after failures: index 0 = after 1st failure, etc.
  * @param bool  $reset_before_each When true, clears $phpmailer global before every attempt.
+ * @param array<int, string> $attachments Absolute file paths for wp_mail attachments.
  * @return array{sent: bool, error_message: string}
  */
-function neworder_wp_mail_attempt_with_retries($to, $subject, $body, $headers, $max_attempts, array $delay_useconds, $reset_before_each = false)
+function neworder_wp_mail_attempt_with_retries($to, $subject, $body, $headers, $max_attempts, array $delay_useconds, $reset_before_each = false, array $attachments = array())
 {
     $max_attempts = max(1, (int) $max_attempts);
 
@@ -136,7 +138,7 @@ function neworder_wp_mail_attempt_with_retries($to, $subject, $body, $headers, $
             }
         }
 
-        $attempt = neworder_wp_mail_attempt($to, $subject, $body, $headers);
+        $attempt = neworder_wp_mail_attempt($to, $subject, $body, $headers, $attachments);
         if ($attempt['sent']) {
             return $attempt;
         }
@@ -223,6 +225,20 @@ function neworder_normalize_design_share_url($url)
     return is_string($out) ? $out : $url;
 }
 
+/**
+ * @param string|false $path Absolute path from neworder_save_order_preview_from_request().
+ */
+function neworder_maybe_unlink_order_preview_temp($path)
+{
+    if (! is_string($path) || $path === '') {
+        return;
+    }
+    if (is_readable($path)) {
+        // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+        @unlink($path);
+    }
+}
+
 function neworder_build_admin_message_body(array $f)
 {
     $lines = array(
@@ -245,7 +261,7 @@ function neworder_build_admin_message_body(array $f)
         'デザインURL: ' . ($f['text-013'] ?? ''),
         '環境: ' . ($f['text-011'] ?? ''),
         'キャップID: ' . ($f['text-004'] ?? ''),
-        'フォント: ' . ($f['text-005'] ?? ''),
+        'フォント: ' . neworder_order_font_label_for_email($f['text-005'] ?? ''),
         '刺繍カラー: ' . ($f['text-006'] ?? ''),
         'フォントサイズ: ' . ($f['text-007'] ?? ''),
         'カーニング: ' . ($f['text-008'] ?? ''),
@@ -274,14 +290,17 @@ function neworder_build_customer_confirmation_body($name)
  * do not see a mismatch (common spam cause when From was `get_option('admin_email')` e.g. Gmail).
  *
  * @param string $admin_reply_to Admin inbox for Reply-To (same as notification email in typical setup).
+ * @param bool   $is_html        When true, use HTML Content-Type (matches rich customer confirmation body).
  * @return array<int, string>
  */
-function neworder_build_customer_confirmation_mail_headers($admin_reply_to)
+function neworder_build_customer_confirmation_mail_headers($admin_reply_to, $is_html = false)
 {
     $admin_reply_to = sanitize_email((string) $admin_reply_to);
 
     $headers = array(
-        'Content-Type: text/plain; charset=UTF-8',
+        $is_html
+            ? 'Content-Type: text/html; charset=UTF-8'
+            : 'Content-Type: text/plain; charset=UTF-8',
         'Reply-To: ' . $admin_reply_to,
     );
 
@@ -348,8 +367,10 @@ function neworder_schedule_fallback_customer_confirmation_mail($your_email, $sub
  * @param string               $body            Body.
  * @param string[]|string      $headers         Same shape as wp_mail $headers.
  * @param string               $admin_for_cron  Admin mailbox for Reply-To when scheduling cron backup.
+ * @param array<int, string>   $attachments     Paths passed to wp_mail (same preview file as admin mail when present).
+ * @param string               $preview_cleanup_path If non-empty, unlink after shutdown send attempt (temp preview file).
  */
-function neworder_register_customer_confirmation_on_shutdown($to, $subject, $body, $headers, $admin_for_cron)
+function neworder_register_customer_confirmation_on_shutdown($to, $subject, $body, $headers, $admin_for_cron, array $attachments = array(), $preview_cleanup_path = '')
 {
     if (! apply_filters('neworder_send_customer_confirmation_on_shutdown', true)) {
         return;
@@ -359,6 +380,7 @@ function neworder_register_customer_confirmation_on_shutdown($to, $subject, $bod
     $admin_for_cron = sanitize_email((string) $admin_for_cron);
     $subject         = (string) $subject;
     $body            = (string) $body;
+    $preview_cleanup_path = (string) $preview_cleanup_path;
     if (! is_array($headers)) {
         $headers = array($headers);
     }
@@ -369,7 +391,7 @@ function neworder_register_customer_confirmation_on_shutdown($to, $subject, $bod
 
     add_action(
         'shutdown',
-        static function () use ($to, $subject, $body, $headers, $admin_for_cron) {
+        static function () use ($to, $subject, $body, $headers, $admin_for_cron, $attachments, $preview_cleanup_path) {
             $pause = (int) apply_filters('neworder_shutdown_customer_mail_pause_microseconds', 400000);
             if ($pause > 0) {
                 usleep(min(max(0, $pause), 2000000));
@@ -393,8 +415,14 @@ function neworder_register_customer_confirmation_on_shutdown($to, $subject, $bod
                 $headers,
                 $attempts,
                 $delays,
-                true
+                true,
+                $attachments
             );
+
+            if ($preview_cleanup_path !== '' && is_readable($preview_cleanup_path)) {
+                // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+                @unlink($preview_cleanup_path);
+            }
 
             if (! $result['sent'] && defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
                 // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
@@ -425,9 +453,11 @@ function neworder_run_fallback_customer_confirmation_mail($your_email, $subject,
         return;
     }
 
+    $is_html_body = (stripos((string) $body, '<body') !== false || stripos((string) $body, '<table') !== false);
+
     $headers = apply_filters(
         'neworder_customer_confirmation_mail_headers',
-        neworder_build_customer_confirmation_mail_headers($reply_to),
+        neworder_build_customer_confirmation_mail_headers($reply_to, $is_html_body),
         $your_email,
         $reply_to,
         null
@@ -448,7 +478,8 @@ function neworder_run_fallback_customer_confirmation_mail($your_email, $subject,
         $headers,
         $attempts,
         is_array($delay_usec) ? $delay_usec : array(600000, 1200000),
-        true
+        true,
+        array()
     );
 
     if (! $result['sent']) {
@@ -559,20 +590,43 @@ function neworder_dispatch_order_request(array $params)
 
     do_action('neworder_before_send_order_emails', $f);
 
+    $use_rich_html = (bool) apply_filters('neworder_order_emails_use_html', true);
+    $preview_path  = false;
+    if ($use_rich_html) {
+        $preview_path = neworder_save_order_preview_from_request($params);
+    }
+    $mail_attachments = array();
+    if (is_string($preview_path) && $preview_path !== '' && is_readable($preview_path)) {
+        $mail_attachments = array($preview_path);
+    }
+    $has_preview_attachment = $mail_attachments !== array();
+    $preview_cleanup        = (is_string($preview_path) && $preview_path !== '') ? $preview_path : '';
+
     $admin_email = neworder_get_notification_email();
     if (! is_email($admin_email)) {
+        neworder_maybe_unlink_order_preview_temp($preview_cleanup);
+
         return new WP_REST_Response(array('success' => false, 'message' => __('通知先メールの設定エラーです。', 'capstylus-clone')), 500);
     }
 
     $admin_subject = __('【NEW ORDER】新規ご注文', 'capstylus-clone');
-    $admin_body    = neworder_build_admin_message_body($f);
-    $admin_headers = array(
-        'Content-Type: text/plain; charset=UTF-8',
-        'Reply-To: ' . $your_name . ' <' . $your_email . '>',
-    );
-
     $customer_subject = __('【NEW ORDER】注文を受け付けました', 'capstylus-clone');
-    $customer_body    = neworder_build_customer_confirmation_body($your_name);
+
+    if ($use_rich_html) {
+        $admin_body    = neworder_build_admin_email_html($f, $has_preview_attachment);
+        $customer_body = neworder_build_customer_email_html($f, $your_name, $has_preview_attachment);
+        $admin_headers = array(
+            'Content-Type: text/html; charset=UTF-8',
+            'Reply-To: ' . $your_name . ' <' . $your_email . '>',
+        );
+    } else {
+        $admin_body    = neworder_build_admin_message_body($f);
+        $customer_body = neworder_build_customer_confirmation_body($your_name);
+        $admin_headers = array(
+            'Content-Type: text/plain; charset=UTF-8',
+            'Reply-To: ' . $your_name . ' <' . $your_email . '>',
+        );
+    }
 
     $admin_subject    = apply_filters('neworder_admin_email_subject', $admin_subject, $f);
     $customer_subject = apply_filters('neworder_customer_email_subject', $customer_subject, $f);
@@ -581,7 +635,7 @@ function neworder_dispatch_order_request(array $params)
 
     $customer_headers = apply_filters(
         'neworder_customer_confirmation_mail_headers',
-        neworder_build_customer_confirmation_mail_headers($admin_email),
+        neworder_build_customer_confirmation_mail_headers($admin_email, $use_rich_html),
         $your_email,
         $admin_email,
         $f
@@ -615,7 +669,7 @@ function neworder_dispatch_order_request(array $params)
 
         neworder_wp_mail_force_new_phpmailer_instance();
 
-        $admin_result = neworder_wp_mail_attempt($admin_email, $admin_subject, $admin_body, $admin_headers);
+        $admin_result = neworder_wp_mail_attempt($admin_email, $admin_subject, $admin_body, $admin_headers, $mail_attachments);
 
         neworder_mail_process_log_step(
             $mail_log,
@@ -630,6 +684,7 @@ function neworder_dispatch_order_request(array $params)
         );
 
         if (! $admin_result['sent']) {
+            neworder_maybe_unlink_order_preview_temp($preview_cleanup);
             if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
                 // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
                 error_log('NEW ORDER: admin wp_mail failed: ' . $admin_result['error_message']);
@@ -654,7 +709,9 @@ function neworder_dispatch_order_request(array $params)
             $customer_subject,
             $customer_body,
             $customer_headers,
-            $admin_email
+            $admin_email,
+            $mail_attachments,
+            $preview_cleanup
         );
 
         $customer_queued = true;
@@ -735,7 +792,8 @@ function neworder_dispatch_order_request(array $params)
             $customer_headers,
             $customer_attempts,
             $retry_delays_usec,
-            true
+            true,
+            $mail_attachments
         );
 
         $customer_sent = $customer_result['sent'];
@@ -762,7 +820,7 @@ function neworder_dispatch_order_request(array $params)
 
     neworder_mail_process_log_step($mail_log, $mail_t0, 'admin_wp_mail_start', array('role' => 'admin_notification'));
 
-    $admin_result = neworder_wp_mail_attempt($admin_email, $admin_subject, $admin_body, $admin_headers);
+    $admin_result = neworder_wp_mail_attempt($admin_email, $admin_subject, $admin_body, $admin_headers, $mail_attachments);
 
     neworder_mail_process_log_step(
         $mail_log,
@@ -777,6 +835,7 @@ function neworder_dispatch_order_request(array $params)
     );
 
     if (! $admin_result['sent']) {
+        neworder_maybe_unlink_order_preview_temp($preview_cleanup);
         if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
             // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
             error_log('NEW ORDER: admin wp_mail failed: ' . $admin_result['error_message']);
@@ -814,7 +873,8 @@ function neworder_dispatch_order_request(array $params)
             $customer_headers,
             $customer_attempts,
             $retry_delays_usec,
-            true
+            true,
+            $mail_attachments
         );
 
         $customer_sent = $customer_result['sent'];
@@ -859,6 +919,8 @@ function neworder_dispatch_order_request(array $params)
             'capstylus-clone'
         );
 
+    neworder_maybe_unlink_order_preview_temp($preview_cleanup);
+
     return new WP_REST_Response(
         neworder_order_payload_with_mail_log(
             array(
@@ -897,7 +959,8 @@ function neworder_mirror_append_order_submit_script($html)
         )
     );
 
-    $snippet = '<script>window.NEW_ORDER_ORDER_SUBMIT=' . $config . ';</script>'
+    $snippet = '<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>'
+        . '<script>window.NEW_ORDER_ORDER_SUBMIT=' . $config . ';</script>'
         . '<script src="' . $src . '" defer></script>';
 
     return str_replace('</body>', $snippet . "\n</body>", $html);

@@ -1663,6 +1663,21 @@ $(function(){
 	$('#character').addClass(selected.font);
 	$('input[id*="' + selected.font + '"]').attr('checked', 'checked');
 	$('input[id*="font"]').click(function() {
+		if ($('#font_heisei_gothic:checked').val()) {
+			$('#character').addClass('font_heisei_gothic');
+		} else {
+			$('#character').removeClass('font_heisei_gothic');
+		}
+		if ($('#font_heisei_maru:checked').val()) {
+			$('#character').addClass('font_heisei_maru');
+		} else {
+			$('#character').removeClass('font_heisei_maru');
+		}
+		if ($('#font_heisei_mincho:checked').val()) {
+			$('#character').addClass('font_heisei_mincho');
+		} else {
+			$('#character').removeClass('font_heisei_mincho');
+		}
 		if ($('#font_colleges:checked').val()) {
 			$('#character').addClass('font_colleges');
 		} else {
