@@ -259,14 +259,7 @@ function neworder_build_admin_message_body(array $f)
         'キャップボディ: ' . ($f['text-002'] ?? ''),
         '単価: ' . ($f['text-003'] ?? ''),
         'デザインURL: ' . ($f['text-013'] ?? ''),
-        '環境: ' . ($f['text-011'] ?? ''),
-        'キャップID: ' . ($f['text-004'] ?? ''),
         'フォント: ' . neworder_order_font_label_for_email($f['text-005'] ?? ''),
-        '刺繍カラー: ' . ($f['text-006'] ?? ''),
-        'フォントサイズ: ' . ($f['text-007'] ?? ''),
-        'カーニング: ' . ($f['text-008'] ?? ''),
-        '縦位置: ' . ($f['text-009'] ?? ''),
-        '横位置: ' . ($f['text-010'] ?? ''),
     );
 
     return implode("\n", $lines);

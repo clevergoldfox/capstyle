@@ -9,8 +9,6 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-require_once get_template_directory() . '/inc/order-form-cf7.php';
-require_once get_template_directory() . '/inc/cf7-loader-fix.php';
 require_once get_template_directory() . '/inc/theme-setup.php';
 require_once get_template_directory() . '/inc/mirror-renderer.php';
 require_once get_template_directory() . '/inc/order-email-rich.php';

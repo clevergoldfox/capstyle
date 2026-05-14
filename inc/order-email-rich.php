@@ -72,14 +72,7 @@ function neworder_build_order_details_rows_html(array $f)
         array('キャップボディ', (string) ($f['text-002'] ?? ''), false),
         array('単価', (string) ($f['text-003'] ?? ''), false),
         array('デザインURL', $design_cell, true),
-        array('環境', (string) ($f['text-011'] ?? ''), false),
-        array('キャップID', (string) ($f['text-004'] ?? ''), false),
         array('フォント', neworder_order_font_label_for_email($f['text-005'] ?? ''), false),
-        array('刺繍カラー', (string) ($f['text-006'] ?? ''), false),
-        array('フォントサイズ', (string) ($f['text-007'] ?? ''), false),
-        array('カーニング', (string) ($f['text-008'] ?? ''), false),
-        array('縦位置', (string) ($f['text-009'] ?? ''), false),
-        array('横位置', (string) ($f['text-010'] ?? ''), false),
         array('氏名', (string) ($f['your-name'] ?? ''), false),
         array('メール', (string) ($f['your-email'] ?? ''), false),
         array('住所', (string) ($f['address'] ?? ''), false),
@@ -90,7 +83,7 @@ function neworder_build_order_details_rows_html(array $f)
         array('備考', (string) ($f['your-message'] ?? ''), 'remarks'),
     );
 
-    $out = '<table cellpadding="8" cellspacing="0" border="1" style="border-collapse:collapse;max-width:640px;font-family:sans-serif;font-size:14px;">';
+    $out = '<table cellpadding="8" cellspacing="0" border="1" style="border-collapse:collapse;max-width:720px;width:100%;font-family:sans-serif;font-size:14px;">';
     foreach ($rows as $row) {
         if ($row[2] === true) {
             $cell = $row[1];
@@ -99,7 +92,7 @@ function neworder_build_order_details_rows_html(array $f)
         } else {
             $cell = esc_html($row[1]);
         }
-        $out .= '<tr><th style="text-align:left;background:#f3f4f6;width:38%;">' . esc_html($row[0]) . '</th><td>' . $cell . '</td></tr>';
+        $out .= '<tr><th style="text-align:left;vertical-align:top;background:#f3f4f6;width:55%;">' . esc_html($row[0]) . '</th><td style="vertical-align:top;width:45%;">' . $cell . '</td></tr>';
     }
     $out .= '</table>';
 
