@@ -11,7 +11,7 @@ if (! defined('ABSPATH')) {
 
 /**
  * @param array<string, mixed> $params Raw POST-style params.
- * @return string|false Absolute path to temp PNG/JPEG, or false.
+ * @return string|false Absolute path to a temp .jpg file for wp_mail attachment, or false.
  */
 function neworder_save_order_preview_from_request(array $params)
 {
@@ -30,16 +30,39 @@ function neworder_save_order_preview_from_request(array $params)
         return false;
     }
 
-    if (strncmp($bin, "\x89PNG", 4) !== 0 && strncmp($bin, "\xff\xd8\xff", 3) !== 0) {
+    $is_png  = strncmp($bin, "\x89PNG", 4) === 0;
+    $is_jpeg = strncmp($bin, "\xff\xd8\xff", 3) === 0;
+    if (! $is_png && ! $is_jpeg) {
         return false;
     }
 
-    $tmp = wp_tempnam('neworder-preview');
-    if (! $tmp || @file_put_contents($tmp, $bin) === false) {
+    $jpg_path = trailingslashit(get_temp_dir()) . 'neworder-design-' . wp_unique_id() . '.jpg';
+
+    if ($is_jpeg) {
+        if (@file_put_contents($jpg_path, $bin) === false) {
+            return false;
+        }
+
+        return $jpg_path;
+    }
+
+    if (! function_exists('imagecreatefromstring') || ! function_exists('imagejpeg')) {
         return false;
     }
 
-    return $tmp;
+    $image = @imagecreatefromstring($bin);
+    if ($image === false) {
+        return false;
+    }
+
+    $saved = imagejpeg($image, $jpg_path, 85);
+    imagedestroy($image);
+
+    if (! $saved || ! is_readable($jpg_path)) {
+        return false;
+    }
+
+    return $jpg_path;
 }
 
 /**
