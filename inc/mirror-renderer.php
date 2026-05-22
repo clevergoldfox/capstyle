@@ -163,10 +163,17 @@ function capstylus_clone_rewrite_mirror_html($html)
         $html
     );
 
+    $home_path = wp_parse_url(home_url('/'), PHP_URL_PATH);
+    if (! is_string($home_path) || $home_path === '') {
+        $home_path = '/';
+    }
+    $home_path_js = esc_js(untrailingslashit($home_path) ?: '/');
+
     // Ensure white logo rendering on dark header areas.
     $html = str_replace(
         '</head>',
-        '<link rel="preconnect" href="https://fonts.googleapis.com">'
+        '<script>window.NEWORDER_HOME_PATH="' . $home_path_js . '";</script>'
+        . '<link rel="preconnect" href="https://fonts.googleapis.com">'
         . '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
         . '<link href="https://fonts.googleapis.com/css2?family=Kosugi+Maru&family=Noto+Sans+JP:wght@400;700&family=Noto+Serif+JP:wght@400;600&display=swap" rel="stylesheet">'
         . '<style>#character.font_heisei_gothic,.font_heisei_gothic .characterSelect{font-family:\'Noto Sans JP\',sans-serif;font-weight:700}'

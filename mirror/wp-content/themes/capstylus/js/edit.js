@@ -1,3 +1,21 @@
+/**
+ * メール等のデザイン確認リンクでは注文フォームの自動表示を抑止する。
+ *
+ * @return {boolean} true = 自動でフォームを開かない
+ */
+function neworderSkipOrderFormAutoOpenFromUrl() {
+	var search = window.location.search || '';
+	if (/[?&]preview=1(?:&|$)/i.test(search)) {
+		return true;
+	}
+	var path = window.location.pathname.replace(/\/+$/, '') || '/';
+	var homePath = '/';
+	if (typeof window.NEWORDER_HOME_PATH === 'string' && window.NEWORDER_HOME_PATH !== '') {
+		homePath = window.NEWORDER_HOME_PATH.replace(/\/+$/, '') || '/';
+	}
+	return path === '/' || path === '' || path === homePath;
+}
+
 $(function(){
 
 	// ウィンドウサイズセット
@@ -298,8 +316,13 @@ $(function(){
 			'cssText': 'padding-top: 30px !important;'
 		});
 	}
-	// 注文ページ（policy 等）でフォームを表示
-	if (strSearch.indexOf("body") >= 0 && $('#formWrap').length && $('#bg').length) {
+	// デザイン共有URL（メールのデザインURL等）ではフォームを自動表示しない（preview=1 またはトップのシミュレーター）
+	if (
+		strSearch.indexOf("body") >= 0 &&
+		$('#formWrap').length &&
+		$('#bg').length &&
+		!neworderSkipOrderFormAutoOpenFromUrl()
+	) {
 		$('#bg, #formWrap').fadeIn(200);
 	}
 

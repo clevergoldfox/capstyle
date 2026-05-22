@@ -222,7 +222,16 @@ function neworder_normalize_design_share_url($url)
 
     $out = preg_replace('#https?://(?:www\.)?capstylus\.com#i', $replacement, $url);
 
-    return is_string($out) ? $out : $url;
+    if (! is_string($out) || $out === '') {
+        return $url;
+    }
+
+    // デザイン共有: シミュレーターのみ表示（注文フォームの自動ポップアップを抑止）。
+    if (preg_match('/[?&]body=/i', $out) && ! preg_match('/[?&]preview=1(?:&|$)/i', $out)) {
+        $out .= (strpos($out, '?') !== false) ? '&preview=1' : '?preview=1';
+    }
+
+    return $out;
 }
 
 /**
