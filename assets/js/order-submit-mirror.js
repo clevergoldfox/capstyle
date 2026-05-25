@@ -212,19 +212,8 @@
                 pack.body.message ||
                 (success ? '送信しました。' : '送信に失敗しました。');
 
-              /* Customer mail runs in WP Cron shortly after admin mail (SMTP-safe); not an error */
-              if (success && pack.body.customerMailQueued) {
-                showMessage(out, msg, false);
-                return;
-              }
-
-              /* Partial success: order saved server-side but customer confirmation mail failed */
-              if (
-                success &&
-                pack.body.customerMailSent === false &&
-                !pack.body.customerMailQueued
-              ) {
-                showMessage(out, msg, true);
+              if (success && cfg.thankYouUrl) {
+                window.location.href = cfg.thankYouUrl;
                 return;
               }
 

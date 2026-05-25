@@ -945,10 +945,11 @@ function neworder_mirror_append_order_submit_script($html)
 
     $config = wp_json_encode(
         array(
-            'ajaxUrl'             => esc_url_raw(admin_url('admin-ajax.php')),
-            'endpoint'            => esc_url_raw(rest_url('neworder/v1/order')),
-            'nonce'               => wp_create_nonce(NEWORDER_ORDER_NONCE_ACTION),
+            'ajaxUrl'              => esc_url_raw(admin_url('admin-ajax.php')),
+            'endpoint'             => esc_url_raw(rest_url('neworder/v1/order')),
+            'nonce'                => wp_create_nonce(NEWORDER_ORDER_NONCE_ACTION),
             'mailProcessLogClient' => neworder_should_include_mail_process_log(),
+            'thankYouUrl'          => esc_url_raw(home_url('/order-finish/')),
         ),
         JSON_UNESCAPED_SLASHES
     );
